@@ -59,6 +59,7 @@ html, body {
   grid-template-rows: var(--topbar-h) 1fr var(--statusbar-h);
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -770,17 +771,98 @@ html, body {
 .live-overlay__close:hover { color: var(--text); border-color: var(--text-2); }
 
 /* ─── Responsive ─────────────────────────────────────────── */
-@media (max-width: 680px) {
-  :root { --side-w: 100vw; }
-  .main-content {
-    grid-template-columns: 1fr;
-    grid-template-rows: 45vh 1fr;
-  }
-  .resize-gutter { display: none; }
-  .side-panel { border-left: none; border-top: 1px solid var(--border); }
-  .status-bar__right { display: none; }
-  .topbar__program { display: none; }
-}
 @media (max-width: 900px) and (min-width: 681px) {
   :root { --side-w: 33vw; }
+}
+
+@media (max-width: 680px) {
+  :root {
+    --side-w: 100vw;
+    --topbar-h: 40px;
+    --statusbar-h: auto;
+  }
+
+  /* ── Layout ── */
+  .main-content {
+    grid-template-columns: 1fr;
+    grid-template-rows: 35dvh 1fr;
+  }
+  .resize-gutter { display: none; }
+  .side-panel {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    gap: 8px;
+    padding: 0 10px;
+  }
+  .topbar__program { display: none; }
+  .topbar__sep { display: none; }
+  .topbar__status {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+  .topbar__met { gap: 4px; }
+  .topbar__met-label { font-size: 9px; }
+  .topbar__met-value { font-size: 14px; }
+  .locale-picker__select { font-size: 10px; padding: 2px 4px; }
+
+  /* ── Status bar / footer ── */
+  .status-bar {
+    flex-wrap: wrap;
+    padding: 6px 10px;
+    gap: 4px 10px;
+  }
+  .status-bar__left {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .status-bar__left .status-bar__item:nth-child(n+3) { display: none; }
+  .status-bar__right {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+  .status-bar__right .status-bar__item {
+    flex: 1;
+    min-width: 0;
+  }
+  .status-bar__right .status-bar__val {
+    font-size: 10px;
+  }
+  .status-bar__lbl { font-size: 9px; letter-spacing: 0.08em; }
+  .status-bar__val { font-size: 10px; }
+  .status-bar__right .status-bar__divider { display: none; }
+
+  /* ── Side panel sections ── */
+  .stream-wrap { aspect-ratio: 16/9; }
+  .telem-item {
+    padding: 8px 10px 6px;
+  }
+  .telem-item__value { font-size: clamp(18px, 5.5cqi, 30px); }
+  .telem-item__value--mono { font-size: clamp(14px, 4.2cqi, 22px); }
+  .chart-wrap { height: 60px; }
+
+  /* ── Timeline ── */
+  .event { padding: 4px 8px 4px 32px; }
+  .event__name { font-size: clamp(12px, 3.4cqi, 16px); }
+  .event__met { font-size: clamp(9px, 2.6cqi, 13px); }
+  .timeline-track { left: 19px; }
+  .event::before { left: 17px; width: 4px; height: 4px; }
+
+  /* ── Orbit view ── */
+  .orbit-fullscreen-btn { top: 6px; right: 6px; width: 26px; height: 26px; }
+  .orbit-phase-overlay { bottom: 6px; left: 6px; }
+  .orbit-controls-hint { display: none; }
+
+  /* ── Credits dialog ── */
+  .credits-dialog { padding: 12px; }
+  .credits-dialog__inner { max-height: calc(100dvh - 24px); }
+  .credits-dialog__header { padding: 12px 14px; }
+  .credits-dialog__body { padding: 14px; }
+
+  /* ── Live overlay ── */
+  .live-overlay { padding: 12px; }
+  .live-overlay__frame { width: min(100%, 95vw); }
 }

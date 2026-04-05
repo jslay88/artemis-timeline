@@ -213,6 +213,7 @@ if (distCanvas) {
 const scrollEl = document.querySelector(".timeline-scroll");
 let userScrolledAt = 0;
 const SCROLL_PAUSE_MS = 15_000;
+const mobileQuery = window.matchMedia("(max-width: 680px)");
 
 if (scrollEl) {
   scrollEl.addEventListener("wheel", () => { userScrolledAt = Date.now(); }, { passive: true });
@@ -306,7 +307,7 @@ function updateDashboard() {
       else if (row === currentEl) row.classList.add("timeline-row--current");
       else                   row.classList.add("timeline-row--future");
     }
-    if (currentEl && Date.now() - userScrolledAt > SCROLL_PAUSE_MS) {
+    if (currentEl && !mobileQuery.matches && Date.now() - userScrolledAt > SCROLL_PAUSE_MS) {
       const rect = currentEl.getBoundingClientRect();
       const container = scrollEl?.getBoundingClientRect();
       if (container && (rect.top < container.top || rect.bottom > container.bottom)) {

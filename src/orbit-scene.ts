@@ -157,7 +157,7 @@ function buildOrionPlaceholder(): OrionCraft {
     new THREE.SphereGeometry(0.06, 8, 8),
     new THREE.MeshBasicMaterial({ color: 0xFC3D21, transparent: true, opacity: 0.25 })
   );
-  engineGlow.position.z = -0.73;
+  engineGlow.position.z = 0.73;
   group.add(engineGlow);
   group.scale.setScalar(0.25);
   return { group, engineGlow };
@@ -633,7 +633,7 @@ export function createOrbitScene(
   const { group: craft, engineGlow } = buildOrionPlaceholder();
   scene.add(craft);
   loadOrionModel(craft, base, loadMgr);
-  const craftForward = new THREE.Vector3(0, 0, 1);
+  const craftForward = new THREE.Vector3(0, 0, -1);
   const trail = createTrailSystem(scene);
 
   const posMarker = new THREE.Mesh(
