@@ -448,8 +448,9 @@ export function createOrbitScene(canvas, clock) {
     roughness: 0.72,
   });
 
+  const base = import.meta.env.BASE_URL;
   function loadTex(path, cb) {
-    loader.load(`/textures/${path}`, (tex) => {
+    loader.load(`${base}textures/${path}`, (tex) => {
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
       cb(tex);
@@ -494,7 +495,7 @@ export function createOrbitScene(canvas, clock) {
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
-  loader.load("/textures/earth-night.jpg", (tex) => {
+  loader.load(`${base}textures/earth-night.jpg`, (tex) => {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     nightMat.uniforms.nightTexture.value = tex;
@@ -513,7 +514,7 @@ export function createOrbitScene(canvas, clock) {
     opacity: 0.3,
     depthWrite: false,
   });
-  loader.load("/textures/earth-clouds.png", (tex) => {
+  loader.load(`${base}textures/earth-clouds.png`, (tex) => {
     tex.colorSpace = THREE.SRGBColorSpace;
     cloudsMat.alphaMap = tex;
     cloudsMat.needsUpdate = true;
@@ -561,7 +562,7 @@ export function createOrbitScene(canvas, clock) {
     metalness: 0.02,
     roughness: 0.98,
   });
-  loader.load("/textures/moon.jpg", (tex) => {
+  loader.load(`${base}textures/moon.jpg`, (tex) => {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     moonMat.map = tex;
