@@ -58,6 +58,16 @@ const sortedRows: Array<{ el: HTMLElement; h: number }> = timelineRows
 
 const TOTAL_MET_HOURS = (SPLASH.getTime() - LAUNCH.getTime()) / 3600000;
 
+const timelineTrack = document.querySelector<HTMLElement>(".timeline-track");
+const timelineTrackLine = document.querySelector<HTMLElement>(".timeline-track__line");
+const timelineList  = document.getElementById("timeline");
+
+function syncTrackHeight(): void {
+  if (timelineTrack && timelineList) {
+    timelineTrack.style.height = `${timelineList.scrollHeight}px`;
+  }
+}
+
 /* ══════════════════════════════════════════════
    Inject local times into timeline rows
    ══════════════════════════════════════════════ */
@@ -126,6 +136,7 @@ injectLocalTimes();
       const clamped = Math.max(200, Math.min(sideW, window.innerWidth * 0.6));
       root.style.setProperty("--side-w", `${clamped}px`);
       orbitApi?.resize();
+      syncTrackHeight();
     });
 
     window.addEventListener("mouseup", () => {
@@ -134,6 +145,7 @@ injectLocalTimes();
       gutter.classList.remove("resize-gutter--active");
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
+      updateDashboard();
     });
   }
 }
@@ -258,9 +270,11 @@ function updateDashboard() {
   distChart?.setNeedle(metHours);
 
   // ── Timeline marker ──
+  syncTrackHeight();
   if (timelineNow) {
     const nowPx = computeNowPx(state);
     (timelineNow as HTMLElement).style.top = `${nowPx}px`;
+    if (timelineTrackLine) timelineTrackLine.style.height = `${nowPx}px`;
     if (timelineNowLabel) {
       if (state.phase === "pre")      timelineNowLabel.textContent = t("timeline.t0");
       else if (state.phase === "complete") timelineNowLabel.textContent = t("timeline.end");

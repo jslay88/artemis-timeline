@@ -26,7 +26,7 @@
 
   --topbar-h:    44px;
   --statusbar-h: 36px;
-  --side-w:      340px;
+  --side-w:      28vw;
 }
 
 /* ─── Reset & base ───────────────────────────────────────── */
@@ -71,6 +71,7 @@ html, body {
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border);
   z-index: 10;
+  line-height: 1;
 }
 
 .topbar__left {
@@ -429,15 +430,16 @@ html, body {
   top: 0;
   left: 23px;
   width: 1px;
-  bottom: 0;
   pointer-events: none;
   z-index: 1;
 }
 .timeline-track__line {
   position: absolute;
-  top: 0; bottom: 0; left: 0;
+  top: 0; left: 0;
   width: 1px;
+  height: 0;
   background: var(--border);
+  transition: height 0.4s ease;
 }
 .timeline-track__now {
   position: absolute;
@@ -456,7 +458,7 @@ html, body {
 }
 
 /* Timeline list */
-.timeline { list-style: none; padding: 4px 0; position: relative; z-index: 2; }
+.timeline { list-style: none; padding: 4px 0; }
 
 .event {
   padding: 5px 10px 5px 36px;
@@ -780,5 +782,5 @@ html, body {
   .topbar__program { display: none; }
 }
 @media (max-width: 900px) and (min-width: 681px) {
-  :root { --side-w: 280px; }
+  :root { --side-w: 33vw; }
 }
