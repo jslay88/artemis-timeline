@@ -2,7 +2,10 @@
    Artemis II — Internationalisation engine
    ════════════════════════════════════════════ */
 
-const L = {
+type LocaleStrings = Record<string, string>;
+type LocaleDict = Record<string, LocaleStrings>;
+
+const L: LocaleDict = {
 
 /* ─────────── English (base) ─────────── */
 en: {
@@ -1050,18 +1053,18 @@ ro: {
    Engine
    ════════════════════════════════════════════ */
 
-let _locale = "en";
-const _listeners = new Set();
+let _locale: string = "en";
+const _listeners = new Set<(code: string) => void>();
 
-export function t(key) {
+export function t(key: string): string {
   return L[_locale]?.[key] ?? L.en[key] ?? key;
 }
 
-export function getLocale() {
+export function getLocale(): string {
   return _locale;
 }
 
-export function setLocale(code) {
+export function setLocale(code: string): void {
   if (!L[code]) return;
   _locale = code;
   document.documentElement.lang = code;
@@ -1071,12 +1074,12 @@ export function setLocale(code) {
   for (const fn of _listeners) fn(code);
 }
 
-export function onLocaleChange(fn) {
+export function onLocaleChange(fn: (code: string) => void): () => boolean {
   _listeners.add(fn);
   return () => _listeners.delete(fn);
 }
 
-export function getLocales() {
+export function getLocales(): Array<{ code: string; name: string; flag: string }> {
   return Object.entries(L).map(([code, data]) => ({
     code,
     name: data._name,
@@ -1084,26 +1087,26 @@ export function getLocales() {
   }));
 }
 
-export function applyI18nToDom() {
-  for (const el of document.querySelectorAll("[data-i18n]")) {
-    el.textContent = t(el.dataset.i18n);
+export function applyI18nToDom(): void {
+  for (const el of document.querySelectorAll<HTMLElement>("[data-i18n]")) {
+    el.textContent = t(el.dataset.i18n!);
   }
-  for (const el of document.querySelectorAll("[data-i18n-html]")) {
-    el.innerHTML = t(el.dataset.i18nHtml);
+  for (const el of document.querySelectorAll<HTMLElement>("[data-i18n-html]")) {
+    el.innerHTML = t(el.dataset.i18nHtml!);
   }
-  for (const el of document.querySelectorAll("[data-i18n-title]")) {
-    el.title = t(el.dataset.i18nTitle);
+  for (const el of document.querySelectorAll<HTMLElement>("[data-i18n-title]")) {
+    el.title = t(el.dataset.i18nTitle!);
   }
-  for (const el of document.querySelectorAll("[data-i18n-label]")) {
-    el.setAttribute("aria-label", t(el.dataset.i18nLabel));
+  for (const el of document.querySelectorAll<HTMLElement>("[data-i18n-label]")) {
+    el.setAttribute("aria-label", t(el.dataset.i18nLabel!));
   }
 }
 
-export function initI18n() {
+export function initI18n(): string {
   const stored = localStorage.getItem("artemis-locale");
-  const browser = navigator.language?.split("-")[0];
+  const browser: string | undefined = navigator.language?.split("-")[0];
   _locale =
-    stored && L[stored] ? stored : L[browser] ? browser : "en";
+    stored && L[stored] ? stored : browser !== undefined && L[browser] ? browser : "en";
   document.documentElement.lang = _locale;
   document.title = t("title");
   applyI18nToDom();

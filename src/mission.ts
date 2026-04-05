@@ -6,11 +6,22 @@ const MISSION_DURATION_MS = (9 * 24 + 1 + 46 / 60) * 3600 * 1000;
 
 export const SPLASH = new Date(LAUNCH.getTime() + MISSION_DURATION_MS);
 
+type MissionPhase = "pre" | "flight" | "complete";
+
+export interface MissionState {
+  phase: MissionPhase;
+  progress: number;
+  elapsedMs: number;
+  metHours: number;
+  metLabel: string;
+  toLaunchMs: number;
+  remainingMs: number;
+}
+
 /**
  * Format decimal hours as MET "dd/hh:mm:ss" (chart-style day/hh:mm:ss from liftoff).
- * @param {number} hours
  */
-export function formatMET(hours) {
+export function formatMET(hours: number): string {
   if (!Number.isFinite(hours) || hours < 0) return "00/00:00:00";
   const totalSec = Math.floor(hours * 3600);
   const days = Math.floor(totalSec / 86400);
@@ -23,9 +34,8 @@ export function formatMET(hours) {
 
 /**
  * Wall-clock time in the visitor's locale and time zone (for timeline labels).
- * @param {Date} date
  */
-export function formatLocaleDateTime(date) {
+export function formatLocaleDateTime(date: Date): string {
   try {
     return new Intl.DateTimeFormat(undefined, {
       dateStyle: "medium",
@@ -36,19 +46,8 @@ export function formatLocaleDateTime(date) {
   }
 }
 
-/**
- * @param {Date} [now]
- * @returns {{
- *   phase: 'pre' | 'flight' | 'complete',
- *   progress: number,
- *   elapsedMs: number,
- *   metHours: number,
- *   metLabel: string,
- *   toLaunchMs: number,
- *   remainingMs: number
- * }}
- */
-export function getMissionState(now = new Date()) {
+/** Phase, progress, MET, and countdown fields relative to `now`. */
+export function getMissionState(now: Date = new Date()): MissionState {
   const t = now.getTime();
   const t0 = LAUNCH.getTime();
   const t1 = SPLASH.getTime();
@@ -93,7 +92,7 @@ export function getMissionState(now = new Date()) {
 }
 
 /** Format ms as "Xd Xh Xm Xs" for countdowns. */
-export function formatCountdown(ms) {
+export function formatCountdown(ms: number): string {
   if (ms <= 0) return "0s";
   const s = Math.floor(ms / 1000);
   const days = Math.floor(s / 86400);
