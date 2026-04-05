@@ -228,6 +228,8 @@ html, body {
 /* Three.js injected elements */
 .orbit-label {
   position: absolute;
+  top: 0;
+  left: 0;
   pointer-events: none;
   font-family: var(--font-mono);
   font-size: 9px;
@@ -241,6 +243,8 @@ html, body {
 
 .orbit-tooltip {
   position: absolute;
+  top: 0;
+  left: 0;
   background: rgba(8,8,8,0.94);
   border: 1px solid var(--border-hi);
   color: var(--text);
