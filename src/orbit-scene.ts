@@ -9,6 +9,7 @@ import gsap from "gsap";
 import { t } from "./i18n.ts";
 import {
   getTrajectoryPoints,
+  getPositionAtMET,
   getMoonPosition,
   OEM_START_MET_H,
   OEM_END_MET_H,
@@ -22,13 +23,13 @@ import {
  * True-scale body sizes and distance.
  *   Earth radius  ≈ 6 371 km   → 1 unit
  *   Moon radius   ≈ 1 737 km   → 0.2727 units  (0.273× Earth)
- *   Earth–Moon    ≈ 384 400 km  → 60.33 units   (60.3× Earth radius)
+ *   Earth–Moon    ≈ 404 740 km  → 63.53 units   (at mission epoch, Moon near apogee)
  */
 const EARTH_RADIUS = 1;
 const MOON_RADIUS = 0.2727;
 // Moon position derived from real OEM ephemeris data (EME2000 → Three.js transform)
 const MOON_POS: THREE.Vector3 = getMoonPosition();
-const TOTAL_MET_HOURS = 217.7667;
+const TOTAL_MET_HOURS = OEM_END_MET_H;
 const SUN_DIR = new THREE.Vector3(1, 0.35, 0.5).normalize();
 
 /*
@@ -36,7 +37,7 @@ const SUN_DIR = new THREE.Vector3(1, 0.35, 0.5).normalize();
  * OEM covers MET +3.37h (post-TLI) through MET +217.3h (pre-splashdown).
  * Control points are time-uniform EME2000 positions converted to Three.js coords.
  */
-const _trajPoints = getTrajectoryPoints(400);
+const _trajPoints = getTrajectoryPoints(800);
 const curve = new THREE.CatmullRomCurve3(_trajPoints, false, "catmullrom", 0.5);
 
 /**
@@ -55,11 +56,11 @@ interface Milestone {
 
 const MILESTONES: Milestone[] = [
   { key: "ms.launch", metHours: 0, color: 0x4ade80 },
-  { key: "ms.tli", metHours: 25.617, color: 0x60a5fa },
-  { key: "ms.lunarSoi", metHours: 103.983, color: 0xa78bfa },
-  { key: "ms.closeApproach", metHours: 121.39, color: 0xfbbf24 },
-  { key: "ms.maxDistance", metHours: 121.45, color: 0xf59e0b },
-  { key: "ms.soiExit", metHours: 139.78, color: 0xa78bfa },
+  { key: "ms.tli", metHours: 25.244, color: 0x60a5fa },
+  { key: "ms.lunarSoi", metHours: 102.111, color: 0xa78bfa },
+  { key: "ms.closeApproach", metHours: 120.511, color: 0xfbbf24 },
+  { key: "ms.maxDistance", metHours: 120.55, color: 0xf59e0b },
+  { key: "ms.soiExit", metHours: 138.911, color: 0xa78bfa },
   { key: "ms.splashdown", metHours: 217.767, color: 0xef4444 },
 ];
 
@@ -162,8 +163,8 @@ function buildOrionPlaceholder(): OrionCraft {
   return { group, engineGlow };
 }
 
-function loadOrionModel(group: THREE.Group, basePath: string): void {
-  new GLTFLoader().load(
+function loadOrionModel(group: THREE.Group, basePath: string, mgr?: THREE.LoadingManager): void {
+  new GLTFLoader(mgr).load(
     `${basePath}models/orion.glb`,
     (gltf) => {
       const model = gltf.scene;
@@ -266,59 +267,37 @@ function createTrailSystem(scene: THREE.Scene): TrailSystem {
 }
 
 /* ════════════════════════════════════════════
-   Stars with size variation
+   Skybox — NASA Deep Star Maps 2020
+   ════════════════════════════════════════════
+   Equirectangular panorama of 1.7 billion real stars (Gaia DR2 +
+   Hipparcos-2 + Tycho-2) mapped onto a large inverted sphere.
+   Source: https://svs.gsfc.nasa.gov/4851 (public domain).
    ════════════════════════════════════════════ */
 
-function createStars(count: number = 8000): THREE.Points {
-  const geo = new THREE.BufferGeometry();
-  const verts = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 3);
-  const sizes = new Float32Array(count);
-
-  for (let i = 0; i < count; i++) {
-    const i3 = i * 3;
-    verts[i3] = (Math.random() - 0.5) * 2000;
-    verts[i3 + 1] = (Math.random() - 0.5) * 2000;
-    verts[i3 + 2] = (Math.random() - 0.5) * 2000;
-    const b = 0.4 + Math.random() * 0.6;
-    const w = Math.random();
-    colors[i3] = b * (0.85 + w * 0.15);
-    colors[i3 + 1] = b * (0.88 + w * 0.12);
-    colors[i3 + 2] = b;
-    sizes[i] = Math.random() < 0.02 ? 2.5 + Math.random() * 2 : 0.4 + Math.random() * 1.2;
-  }
-
-  geo.setAttribute("position", new THREE.BufferAttribute(verts, 3));
-  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-  geo.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
-
-  const mat = new THREE.ShaderMaterial({
-    uniforms: { pixelRatio: { value: Math.min(window.devicePixelRatio, 2) } },
-    vertexShader: `
-      attribute float size;
-      varying vec3 vColor;
-      uniform float pixelRatio;
-      void main() {
-        vColor = color;
-        vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = size * pixelRatio * (300.0 / -mvPos.z);
-        gl_Position = projectionMatrix * mvPos;
-      }
-    `,
-    fragmentShader: `
-      varying vec3 vColor;
-      void main() {
-        float d = length(gl_PointCoord - vec2(0.5));
-        float a = smoothstep(0.5, 0.05, d);
-        gl_FragColor = vec4(vColor, a * 0.9);
-      }
-    `,
-    transparent: true,
-    vertexColors: true,
+function createStarSkybox(base: string, renderer: THREE.WebGLRenderer, mgr?: THREE.LoadingManager): THREE.Mesh {
+  const SKYBOX_RADIUS = 1400;
+  const geo = new THREE.SphereGeometry(SKYBOX_RADIUS, 64, 32);
+  const mat = new THREE.MeshBasicMaterial({
+    side: THREE.BackSide,
     depthWrite: false,
+    fog: false,
   });
 
-  return new THREE.Points(geo, mat);
+  new THREE.TextureLoader(mgr).load(
+    `${base}textures/starmap.jpg`,
+    (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      mat.map = tex;
+      mat.needsUpdate = true;
+    },
+    undefined,
+    () => {},
+  );
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = -1;
+  return mesh;
 }
 
 /* ════════════════════════════════════════════
@@ -329,6 +308,11 @@ export interface OrbitClock {
   getProgress: () => number;
 }
 
+export interface OrbitLoadCallbacks {
+  onProgress?: (loaded: number, total: number) => void;
+  onReady?: () => void;
+}
+
 export interface OrbitSceneApi {
   resize: () => void;
   toggleFullscreen: () => void;
@@ -337,7 +321,11 @@ export interface OrbitSceneApi {
   dispose: () => void;
 }
 
-export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): OrbitSceneApi {
+export function createOrbitScene(
+  canvas: HTMLCanvasElement,
+  clock: OrbitClock,
+  loadCallbacks?: OrbitLoadCallbacks,
+): OrbitSceneApi {
   const wrap = canvas.parentElement!;
 
   /* ——— Renderer ——— */
@@ -353,10 +341,9 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
   renderer.toneMappingExposure = 1.1;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000000);
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 3000);
-  // Frame the trajectory: Earth (0,0,0) → Moon area (~-19, -28, 50)
+  // Frame the trajectory: Earth (0,0,0) → Moon area (~-20, -29, 53)
   camera.position.set(20, 35, 90);
 
   /* ——— Post-processing: Bloom ——— */
@@ -376,7 +363,7 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
   controls.dampingFactor = 0.06;
-  controls.target.set(-10, -12, 25);
+  controls.target.set(-10, -14, 26);
   controls.minDistance = 3;
   controls.maxDistance = 300;
   controls.autoRotate = true;
@@ -404,9 +391,17 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
   fill.position.set(-30, -10, -20);
   scene.add(fill);
 
-  scene.add(createStars());
+  const base = import.meta.env.BASE_URL;
 
-  const loader = new THREE.TextureLoader();
+  /* ——— Asset loading — managed loader for initial load, unmanaged for LOD ——— */
+  const loadMgr = new THREE.LoadingManager(
+    () => loadCallbacks?.onReady?.(),
+    (_url, loaded, total) => loadCallbacks?.onProgress?.(loaded, total),
+  );
+  const loader = new THREE.TextureLoader(loadMgr);
+  const lodLoader = new THREE.TextureLoader();
+
+  scene.add(createStarSkybox(base, renderer, loadMgr));
 
   /* ════════════════════════════════════════════
      Earth — day surface, night lights, clouds, atmosphere
@@ -420,21 +415,36 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
     metalness: 0.08,
     roughness: 0.72,
   });
-
-  const base = import.meta.env.BASE_URL;
-  function loadTex(path: string, cb: (tex: THREE.Texture) => void): void {
-    loader.load(`${base}textures/${path}`, (tex) => {
+  function loadTex(path: string, cb: (tex: THREE.Texture) => void, lod = false): void {
+    (lod ? lodLoader : loader).load(`${base}textures/${path}`, (tex) => {
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
       cb(tex);
     }, undefined, () => {});
   }
 
+  let earthHdLoaded = false;
+  let earthHdLoading = false;
+  const EARTH_LOD_DIST = 12;
+
   loadTex("earth-day.jpg", (tex) => {
     earthMat.map = tex;
     earthMat.color.set(0xffffff);
     earthMat.needsUpdate = true;
   });
+
+  function checkEarthLOD(): void {
+    if (earthHdLoaded || earthHdLoading) return;
+    const dist = camera.position.length();
+    if (dist < EARTH_LOD_DIST) {
+      earthHdLoading = true;
+      loadTex("earth-day-hd.jpg", (tex) => {
+        earthMat.map = tex;
+        earthMat.needsUpdate = true;
+        earthHdLoaded = true;
+      }, true);
+    }
+  }
   loadTex("earth-normal.jpg", (tex) => {
     tex.colorSpace = THREE.LinearSRGBColorSpace;
     earthMat.normalMap = tex;
@@ -480,18 +490,38 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
   );
   scene.add(nightEarth);
 
-  /* Clouds */
+  /* Clouds — LOD texture swap (2K default, 4K when close) */
   const cloudsMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     transparent: true,
     opacity: 0.3,
     depthWrite: false,
   });
-  loader.load(`${base}textures/earth-clouds.png`, (tex) => {
+  let cloudsHdLoaded = false;
+  let cloudsHdLoading = false;
+  const CLOUD_LOD_DIST = 8;
+
+  function applyCloudTex(tex: THREE.Texture): void {
     tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     cloudsMat.alphaMap = tex;
     cloudsMat.needsUpdate = true;
-  }, undefined, () => {});
+  }
+
+  loader.load(`${base}textures/earth-clouds.jpg`, applyCloudTex, undefined, () => {});
+
+  function checkCloudLOD(): void {
+    if (cloudsHdLoaded || cloudsHdLoading) return;
+    const dist = camera.position.length();
+    if (dist < CLOUD_LOD_DIST) {
+      cloudsHdLoading = true;
+      lodLoader.load(`${base}textures/earth-clouds-hd.jpg`, (tex) => {
+        applyCloudTex(tex);
+        cloudsHdLoaded = true;
+      }, undefined, () => { cloudsHdLoading = false; });
+    }
+  }
+
   const clouds = new THREE.Mesh(
     new THREE.SphereGeometry(EARTH_RADIUS * 1.008, 48, 48),
     cloudsMat
@@ -535,6 +565,10 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
     metalness: 0.02,
     roughness: 0.98,
   });
+  let moonHdLoaded = false;
+  let moonHdLoading = false;
+  const MOON_LOD_DIST = 20;
+
   loader.load(`${base}textures/moon.jpg`, (tex) => {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
@@ -542,6 +576,22 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
     moonMat.color.set(0xffffff);
     moonMat.needsUpdate = true;
   }, undefined, () => {});
+
+  function checkMoonLOD(): void {
+    if (moonHdLoaded || moonHdLoading) return;
+    const dist = camera.position.distanceTo(MOON_POS);
+    if (dist < MOON_LOD_DIST) {
+      moonHdLoading = true;
+      lodLoader.load(`${base}textures/moon-hd.jpg`, (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        moonMat.map = tex;
+        moonMat.needsUpdate = true;
+        moonHdLoaded = true;
+      }, undefined, () => { moonHdLoading = false; });
+    }
+  }
+
   const moon = new THREE.Mesh(moonGeo, moonMat);
   moon.position.copy(MOON_POS);
   scene.add(moon);
@@ -582,7 +632,7 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
 
   const { group: craft, engineGlow } = buildOrionPlaceholder();
   scene.add(craft);
-  loadOrionModel(craft, base);
+  loadOrionModel(craft, base, loadMgr);
   const craftForward = new THREE.Vector3(0, 0, 1);
   const trail = createTrailSystem(scene);
 
@@ -614,8 +664,18 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
   const mouse = new THREE.Vector2();
 
   for (const ms of MILESTONES) {
-    const u = metToU(ms.metHours);
-    const pos = curve.getPoint(u);
+    let pos: THREE.Vector3;
+
+    if (ms.key === "ms.launch" || ms.key === "ms.splashdown") {
+      // Launch and Splashdown happen on/near Earth's surface.
+      // Get the OEM position at the nearest available time and project
+      // it onto the Earth's surface (1.0 radius) so the dot sits on Earth.
+      const rawPos = getPositionAtMET(ms.metHours);
+      pos = rawPos.clone().normalize().multiplyScalar(EARTH_RADIUS * 1.02);
+    } else {
+      // All other milestones: position directly from OEM ephemeris data.
+      pos = getPositionAtMET(ms.metHours);
+    }
 
     const dot = new THREE.Mesh(
       new THREE.SphereGeometry(0.22, 14, 14),
@@ -781,6 +841,11 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
 
     /* Tube progress */
     tubeUniforms.progress.value = u;
+
+    /* LOD — swap in HD textures when camera is close */
+    checkCloudLOD();
+    checkEarthLOD();
+    checkMoonLOD();
 
     /* Rotate bodies */
     const rot = 0.0012;

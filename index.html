@@ -12,6 +12,18 @@
     />
   </head>
   <body>
+    <!-- ═══ Loading screen (inline styles for instant render before CSS) ═══ -->
+    <div id="loading-screen" style="position:fixed;inset:0;z-index:9999;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Inter',system-ui,sans-serif;">
+      <div style="text-align:center;">
+        <div style="font-size:11px;letter-spacing:6px;color:#a0a0a0;margin-bottom:6px;text-transform:uppercase;">NASA</div>
+        <div style="font-size:28px;font-weight:600;letter-spacing:4px;color:#fff;margin-bottom:32px;">ARTEMIS II</div>
+        <div style="width:240px;height:2px;background:rgba(255,255,255,0.08);border-radius:1px;overflow:hidden;">
+          <div id="loading-bar" style="width:0%;height:100%;background:#FC3D21;border-radius:1px;transition:width 0.3s ease-out;"></div>
+        </div>
+        <div id="loading-text" style="font-size:11px;color:#555;margin-top:12px;font-family:'IBM Plex Mono',monospace;letter-spacing:1px;" data-i18n="loading.assets">LOADING ASSETS</div>
+      </div>
+    </div>
+
     <!-- ═══ Dashboard ═══ -->
     <div class="dashboard">
 
@@ -41,7 +53,9 @@
             type="button"
             class="orbit-fullscreen-btn"
             id="orbit-fullscreen"
+            data-i18n-title="orbit.fullscreenTip"
             title="Toggle fullscreen"
+            data-i18n-label="orbit.fullscreenTip"
             aria-label="Toggle fullscreen"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -66,8 +80,8 @@
           <!-- Live stream (always-on, muted autoplay) -->
           <section class="stream-section" aria-label="NASA live broadcast">
             <h2 class="panel-label">
-              LIVE COVERAGE
-              <span class="panel-label__sub live-dot-label" aria-hidden="true">● NASA TV</span>
+              <span data-i18n="sidebar.live">LIVE COVERAGE</span>
+              <span class="panel-label__sub live-dot-label" aria-hidden="true">● <span data-i18n="sidebar.nasaTv">NASA TV</span></span>
             </h2>
             <div class="stream-wrap">
               <iframe
@@ -82,20 +96,20 @@
 
           <!-- Telemetry readouts -->
           <section class="telem-section" aria-label="Live telemetry" role="status" aria-live="polite">
-            <h2 class="panel-label">TELEMETRY</h2>
+            <h2 class="panel-label" data-i18n="sidebar.telemetry">TELEMETRY</h2>
             <div class="telem-grid">
               <div class="telem-item">
-                <span class="telem-item__label">SPEED</span>
+                <span class="telem-item__label" data-i18n="sidebar.speed">Speed</span>
                 <span class="telem-item__value" id="tel-speed">—</span>
                 <span class="telem-item__unit">km/s</span>
               </div>
               <div class="telem-item">
-                <span class="telem-item__label">DISTANCE</span>
+                <span class="telem-item__label" data-i18n="sidebar.distance">Distance</span>
                 <span class="telem-item__value" id="tel-distance">—</span>
                 <span class="telem-item__unit">km</span>
               </div>
               <div class="telem-item">
-                <span class="telem-item__label">ALTITUDE</span>
+                <span class="telem-item__label" data-i18n="sidebar.altitude">Altitude</span>
                 <span class="telem-item__value" id="tel-altitude">—</span>
                 <span class="telem-item__unit">km</span>
               </div>
@@ -108,7 +122,7 @@
 
           <!-- Velocity chart -->
           <section class="chart-section">
-            <h2 class="panel-label">VELOCITY  <span class="panel-label__unit">km/s</span></h2>
+            <h2 class="panel-label"><span data-i18n="sidebar.velocity">Velocity</span>  <span class="panel-label__unit">km/s</span></h2>
             <div class="chart-wrap">
               <canvas id="chart-speed" aria-label="Spacecraft speed over mission time"></canvas>
             </div>
@@ -116,7 +130,7 @@
 
           <!-- Distance chart -->
           <section class="chart-section">
-            <h2 class="panel-label">DISTANCE FROM EARTH  <span class="panel-label__unit">×1000 km</span></h2>
+            <h2 class="panel-label"><span data-i18n="sidebar.distChart">Distance from Earth</span>  <span class="panel-label__unit">×1000 km</span></h2>
             <div class="chart-wrap">
               <canvas id="chart-distance" aria-label="Distance from Earth over mission time"></canvas>
             </div>
@@ -125,7 +139,7 @@
           <!-- Mission timeline (scrollable) -->
           <section class="timeline-section">
             <h2 class="panel-label">
-              MISSION TIMELINE
+              <span data-i18n="sidebar.timeline">Mission Timeline</span>
               <span class="panel-label__sub" id="timeline-now-label">NOW</span>
             </h2>
             <div class="timeline-scroll">
@@ -167,10 +181,10 @@
                   </div>
                 </li>
 
-                <li class="event timeline-row" data-met-hours="25.617">
+                <li class="event timeline-row" data-met-hours="25.244">
                   <div class="event__inner">
                     <span class="event__name" data-i18n="event.tli.name">Trans-Lunar Injection (TLI)</span>
-                    <span class="event__met">01/01:37 MET</span>
+                    <span class="event__met">01/01:15 MET</span>
                   </div>
                 </li>
 
@@ -196,10 +210,10 @@
                   </div>
                 </li>
 
-                <li class="event timeline-row" data-met-hours="103.983">
+                <li class="event timeline-row" data-met-hours="102.111">
                   <div class="event__inner">
                     <span class="event__name" data-i18n="event.lunarSoi.name">Lunar SOI Entry</span>
-                    <span class="event__met">04/06:59 MET</span>
+                    <span class="event__met">04/06:07 MET</span>
                   </div>
                 </li>
 
@@ -218,17 +232,17 @@
                   </div>
                 </li>
 
-                <li class="event timeline-row" data-met-hours="121.39">
+                <li class="event timeline-row" data-met-hours="120.511">
                   <div class="event__inner">
                     <span class="event__name" data-i18n="event.closeApproach.name">Lunar close approach</span>
-                    <span class="event__met">05/01:23 MET</span>
+                    <span class="event__met">05/00:31 MET</span>
                   </div>
                 </li>
 
-                <li class="event timeline-row" data-met-hours="121.45">
+                <li class="event timeline-row" data-met-hours="120.55">
                   <div class="event__inner">
                     <span class="event__name" data-i18n="event.maxDistance.name">Max Earth distance — 413,148 km</span>
-                    <span class="event__met">05/01:27 MET</span>
+                    <span class="event__met">05/00:33 MET</span>
                   </div>
                 </li>
 
@@ -239,10 +253,10 @@
                   </div>
                 </li>
 
-                <li class="event timeline-row" data-met-hours="139.78">
+                <li class="event timeline-row" data-met-hours="138.911">
                   <div class="event__inner">
                     <span class="event__name" data-i18n="event.soiExit.name">Lunar SOI Exit</span>
-                    <span class="event__met">05/19:47 MET</span>
+                    <span class="event__met">05/18:55 MET</span>
                   </div>
                 </li>
 
@@ -315,22 +329,119 @@
       <footer class="status-bar" role="contentinfo">
         <div class="status-bar__left">
           <span class="status-bar__item">
-            <span class="status-bar__lbl">LAUNCH</span>
+            <span class="status-bar__lbl" data-i18n="footer.launch">LAUNCH</span>
             <time class="status-bar__val" datetime="2026-04-01T22:35:12Z">Apr 1, 2026 · 22:35 UTC</time>
           </span>
           <span class="status-bar__divider" aria-hidden="true"></span>
           <span class="status-bar__item">
-            <span class="status-bar__lbl">TRAJECTORY</span>
+            <span class="status-bar__lbl" data-i18n="footer.trajectory">TRAJECTORY</span>
             <span class="status-bar__val">NASA/JSC OEM · EME2000</span>
           </span>
         </div>
         <div class="status-bar__right">
           <span class="status-bar__item">
-            <span class="status-bar__lbl">CREW</span>
+            <span class="status-bar__lbl" data-i18n="footer.crew">CREW</span>
             <span class="status-bar__val">Reid Wiseman · Victor Glover · Christina Koch · Jeremy Hansen</span>
           </span>
+          <span class="status-bar__divider" aria-hidden="true"></span>
+          <button type="button" class="credits-btn" id="credits-open" aria-label="Credits &amp; attributions">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M12 16v-4m0-4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
       </footer>
+
+      <!-- ─── Credits modal ─── -->
+      <dialog class="credits-dialog" id="credits-dialog" aria-label="Credits and attributions">
+        <div class="credits-dialog__inner">
+          <div class="credits-dialog__header">
+            <h2 class="credits-dialog__title" data-i18n="credits.title">Credits &amp; Attributions</h2>
+            <button type="button" class="credits-dialog__close" id="credits-close" aria-label="Close">&times;</button>
+          </div>
+          <div class="credits-dialog__body">
+
+            <section class="credits-section">
+              <h3>Imagery &amp; Textures</h3>
+              <ul>
+                <li>
+                  <strong>Star skybox</strong> &mdash;
+                  <a href="https://svs.gsfc.nasa.gov/4851" target="_blank" rel="noopener">NASA SVS Deep Star Maps 2020</a>.
+                  Data from ESA/Gaia DR2, Hipparcos-2, and Tycho-2 catalogs. Public domain.
+                </li>
+                <li>
+                  <strong>Earth day surface</strong> &mdash;
+                  <a href="https://visibleearth.nasa.gov/collection/1484/blue-marble" target="_blank" rel="noopener">NASA Blue Marble Next Generation</a>. Public domain.
+                </li>
+                <li>
+                  <strong>Earth night lights</strong> &mdash;
+                  <a href="https://visibleearth.nasa.gov/" target="_blank" rel="noopener">NASA Earth Observatory</a>. Public domain.
+                </li>
+                <li>
+                  <strong>Earth clouds</strong> &mdash;
+                  <a href="https://visibleearth.nasa.gov/images/57747/blue-marble-clouds" target="_blank" rel="noopener">NASA Visible Earth</a>. Public domain.
+                </li>
+                <li>
+                  <strong>Moon surface, Earth normal map, Earth specular map</strong> &mdash;
+                  <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener">Solar System Scope</a>
+                  by <a href="https://inove.eu.com/" target="_blank" rel="noopener">INOVE</a>.
+                  Based on NASA/LRO data. Modified: resized and converted to JPEG.
+                  Licensed under
+                  <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.
+                </li>
+              </ul>
+            </section>
+
+            <section class="credits-section">
+              <h3>3D Model</h3>
+              <ul>
+                <li>
+                  <strong>Orion MPCV</strong> &mdash; Derived from
+                  <a href="https://www.nasa.gov/missions/artemis-ii/arow/" target="_blank" rel="noopener">NASA Artemis Real-time Orbit Website (AROW)</a>. Public domain.
+                </li>
+              </ul>
+            </section>
+
+            <section class="credits-section">
+              <h3>Trajectory &amp; Ephemeris Data</h3>
+              <ul>
+                <li>
+                  <strong>Spacecraft trajectory</strong> &mdash; NASA/JSC Orbital Ephemeris Message (OEM), CCSDS format, EME2000/J2000 frame. Public domain.
+                </li>
+                <li>
+                  <strong>Lunar position</strong> &mdash;
+                  <a href="https://ssd.jpl.nasa.gov/horizons/" target="_blank" rel="noopener">JPL Horizons</a>, DE441 ephemeris. Public domain.
+                </li>
+              </ul>
+            </section>
+
+            <section class="credits-section">
+              <h3>Open-Source Libraries</h3>
+              <ul>
+                <li><a href="https://threejs.org/" target="_blank" rel="noopener">Three.js</a> &mdash; MIT License</li>
+                <li><a href="https://gsap.com/" target="_blank" rel="noopener">GSAP</a> &mdash; <a href="https://gsap.com/community/standard-license/" target="_blank" rel="noopener">Standard "No Charge" License</a></li>
+                <li><a href="https://www.chartjs.org/" target="_blank" rel="noopener">Chart.js</a> &mdash; MIT License</li>
+                <li><a href="https://vite.dev/" target="_blank" rel="noopener">Vite</a> &mdash; MIT License</li>
+              </ul>
+            </section>
+
+            <section class="credits-section">
+              <h3>Fonts</h3>
+              <ul>
+                <li><a href="https://rsms.me/inter/" target="_blank" rel="noopener">Inter</a> by Rasmus Andersson &mdash; SIL Open Font License</li>
+                <li><a href="https://github.com/IBM/plex" target="_blank" rel="noopener">IBM Plex Mono</a> by IBM &mdash; SIL Open Font License</li>
+              </ul>
+            </section>
+
+            <p class="credits-disclaimer">
+              This is an unofficial fan project and is not affiliated with or endorsed by NASA.
+              All NASA materials are used in accordance with
+              <a href="https://www.nasa.gov/nasa-brand-center/images-and-media/" target="_blank" rel="noopener">NASA media usage guidelines</a>.
+            </p>
+          </div>
+        </div>
+      </dialog>
 
     </div><!-- .dashboard -->
 

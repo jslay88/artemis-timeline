@@ -7,7 +7,7 @@ import {
   SPLASH,
   type MissionState,
 } from "./mission.ts";
-import { createOrbitScene } from "./orbit-scene.ts";
+import { createOrbitScene, type OrbitLoadCallbacks } from "./orbit-scene.ts";
 import { initI18n, t, setLocale, getLocale, getLocales, onLocaleChange } from "./i18n.ts";
 import { getTelemetry } from "./ephemeris.ts";
 import { createSpeedChart, createDistanceChart, type MissionChart } from "./telemetry-charts.ts";
@@ -57,6 +57,50 @@ const sortedRows: Array<{ el: HTMLElement; h: number }> = timelineRows
   .sort((a, b) => a.h - b.h);
 
 const TOTAL_MET_HOURS = (SPLASH.getTime() - LAUNCH.getTime()) / 3600000;
+
+/* ══════════════════════════════════════════════
+   Inject local times into timeline rows
+   ══════════════════════════════════════════════ */
+function buildLocalTimeFormatter(): Intl.DateTimeFormat {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
+let localFmt = buildLocalTimeFormatter();
+
+function injectLocalTimes(): void {
+  for (const row of timelineRows) {
+    const metH = parseFloat(row.dataset.metHours ?? "");
+    if (!Number.isFinite(metH)) continue;
+
+    const eventDate = new Date(LAUNCH.getTime() + metH * 3600000);
+    const localStr = localFmt.format(eventDate);
+
+    const metSpan = row.querySelector(".event__met");
+    if (!metSpan) continue;
+
+    let wrapper = metSpan.parentElement;
+    if (!wrapper?.classList.contains("event__times")) {
+      wrapper = document.createElement("span");
+      wrapper.className = "event__times";
+      metSpan.parentElement!.insertBefore(wrapper, metSpan);
+      wrapper.appendChild(metSpan);
+    }
+
+    let localSpan = wrapper.querySelector(".event__local") as HTMLElement | null;
+    if (!localSpan) {
+      localSpan = document.createElement("span");
+      localSpan.className = "event__local";
+      wrapper.appendChild(localSpan);
+    }
+    localSpan.textContent = localStr;
+  }
+}
+
+injectLocalTimes();
 
 /* ══════════════════════════════════════════════
    Resizable side panel
@@ -262,6 +306,19 @@ updateDashboard();
 setInterval(updateDashboard, 250);
 
 /* ══════════════════════════════════════════════
+   Loading screen
+   ══════════════════════════════════════════════ */
+const loadingScreen = document.getElementById("loading-screen");
+const loadingBar    = document.getElementById("loading-bar");
+const loadingText   = document.getElementById("loading-text");
+
+function dismissLoadingScreen(): void {
+  if (!loadingScreen) return;
+  loadingScreen.classList.add("loading-screen--done");
+  setTimeout(() => loadingScreen.remove(), 600);
+}
+
+/* ══════════════════════════════════════════════
    3D orbit scene
    ══════════════════════════════════════════════ */
 const orbitCanvas   = document.getElementById("orbit-canvas") as HTMLCanvasElement | null;
@@ -269,16 +326,32 @@ const fullscreenBtn = document.getElementById("orbit-fullscreen");
 let orbitApi: ReturnType<typeof createOrbitScene> | null = null;
 
 if (orbitCanvas) {
+  const loadCb: OrbitLoadCallbacks = {
+    onProgress(loaded, total) {
+      const pct = total > 0 ? Math.round((loaded / total) * 100) : 0;
+      if (loadingBar)  loadingBar.style.width = `${pct}%`;
+      if (loadingText)  loadingText.textContent = `${loaded} / ${total}`;
+    },
+    onReady() {
+      if (loadingBar)  loadingBar.style.width = "100%";
+      if (loadingText)  loadingText.textContent = "✓";
+      setTimeout(dismissLoadingScreen, 400);
+    },
+  };
+
   try {
     orbitApi = createOrbitScene(orbitCanvas, {
       getProgress: () => getMissionState().progress,
-    });
+    }, loadCb);
     window.addEventListener("resize", () => orbitApi?.resize());
     fullscreenBtn?.addEventListener("click", () => orbitApi?.toggleFullscreen());
   } catch (e) {
     console.warn("Orbit 3D unavailable:", e);
     (orbitCanvas.closest(".orbit-panel") as HTMLElement)?.style.setProperty("background", "#0b0b0b");
+    dismissLoadingScreen();
   }
+} else {
+  dismissLoadingScreen();
 }
 
 /* ══════════════════════════════════════════════
@@ -286,5 +359,22 @@ if (orbitCanvas) {
    ══════════════════════════════════════════════ */
 onLocaleChange(() => {
   updateDashboard();
+  localFmt = buildLocalTimeFormatter();
+  injectLocalTimes();
   orbitApi?.updateLabels?.();
 });
+
+/* ══════════════════════════════════════════════
+   Credits dialog
+   ══════════════════════════════════════════════ */
+{
+  const dialog = document.getElementById("credits-dialog") as HTMLDialogElement | null;
+  const openBtn = document.getElementById("credits-open");
+  const closeBtn = document.getElementById("credits-close");
+
+  openBtn?.addEventListener("click", () => dialog?.showModal());
+  closeBtn?.addEventListener("click", () => dialog?.close());
+  dialog?.addEventListener("click", (e) => {
+    if (e.target === dialog) dialog.close();
+  });
+}
