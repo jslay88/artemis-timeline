@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
@@ -149,64 +150,39 @@ interface OrionCraft {
   engineGlow: THREE.Mesh;
 }
 
-function buildOrion(): OrionCraft {
+function buildOrionPlaceholder(): OrionCraft {
   const group = new THREE.Group();
-
-  const whiteMat = new THREE.MeshStandardMaterial({
-    color: 0xe8e8e8, metalness: 0.35, roughness: 0.45,
-  });
-  const darkMat = new THREE.MeshStandardMaterial({
-    color: 0x3a3a3a, metalness: 0.75, roughness: 0.2,
-  });
-  const goldMat = new THREE.MeshStandardMaterial({
-    color: 0xd4a843, metalness: 0.65, roughness: 0.28,
-  });
-  const panelMat = new THREE.MeshStandardMaterial({
-    color: 0x162350, metalness: 0.2, roughness: 0.5,
-    emissive: 0x0a1530, emissiveIntensity: 0.5,
-  });
-
-  const cm = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.4, 0.55, 20), whiteMat);
-  cm.rotation.x = Math.PI / 2;
-  cm.position.z = 0.58;
-  group.add(cm);
-
-  const shield = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.41, 0.41, 0.04, 20),
-    darkMat
-  );
-  shield.rotation.x = Math.PI / 2;
-  shield.position.z = 0.3;
-  group.add(shield);
-
-  const sm = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.8, 20), goldMat);
-  sm.rotation.x = Math.PI / 2;
-  sm.position.z = -0.1;
-  group.add(sm);
-
-  const panelGeo = new THREE.BoxGeometry(0.35, 0.012, 1.7);
-  for (let i = 0; i < 4; i++) {
-    const angle = (i * Math.PI) / 2;
-    const panel = new THREE.Mesh(panelGeo, panelMat);
-    panel.position.set(Math.cos(angle) * 1.1, Math.sin(angle) * 1.1, -0.1);
-    panel.rotation.z = angle;
-    group.add(panel);
-  }
-
-  const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.22, 0.3, 14), darkMat);
-  nozzle.rotation.x = Math.PI / 2;
-  nozzle.position.z = -0.65;
-  group.add(nozzle);
-
   const engineGlow = new THREE.Mesh(
-    new THREE.SphereGeometry(0.15, 12, 12),
-    new THREE.MeshBasicMaterial({ color: 0xFC3D21, transparent: true, opacity: 0.85 })
+    new THREE.SphereGeometry(0.06, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xFC3D21, transparent: true, opacity: 0.25 })
   );
   engineGlow.position.z = -0.73;
   group.add(engineGlow);
-
   group.scale.setScalar(0.25);
   return { group, engineGlow };
+}
+
+function loadOrionModel(group: THREE.Group, basePath: string): void {
+  new GLTFLoader().load(
+    `${basePath}models/orion.glb`,
+    (gltf) => {
+      const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const targetSize = 0.8;
+      const scale = targetSize / maxDim;
+      model.scale.setScalar(scale);
+
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
+      model.rotation.x = -Math.PI / 2;
+
+      group.add(model);
+    },
+    undefined,
+    (err) => { console.warn("Orion GLB load failed, using placeholder:", err); },
+  );
 }
 
 /* ════════════════════════════════════════════
@@ -604,8 +580,9 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
      Spacecraft + trail
      ════════════════════════════════════════════ */
 
-  const { group: craft, engineGlow } = buildOrion();
+  const { group: craft, engineGlow } = buildOrionPlaceholder();
   scene.add(craft);
+  loadOrionModel(craft, base);
   const craftForward = new THREE.Vector3(0, 0, 1);
   const trail = createTrailSystem(scene);
 
@@ -791,12 +768,12 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
     craft.quaternion.setFromUnitVectors(craftForward, tangent);
 
     /* Engine glow pulse */
-    (engineGlow.material as THREE.MeshBasicMaterial).opacity = 0.6 + 0.3 * Math.sin(now * 0.006);
+    (engineGlow.material as THREE.MeshBasicMaterial).opacity = 0.15 + 0.1 * Math.sin(now * 0.006);
 
     /* Position marker */
     posMarker.position.copy(pos);
-    (posMarker.material as THREE.MeshBasicMaterial).opacity = 0.15 + 0.2 * Math.sin(now * 0.004);
-    posMarker.scale.setScalar(1 + 0.35 * Math.sin(now * 0.003));
+    (posMarker.material as THREE.MeshBasicMaterial).opacity = 0.08 + 0.07 * Math.sin(now * 0.004);
+    posMarker.scale.setScalar(1 + 0.2 * Math.sin(now * 0.003));
 
     /* Trail particles — emit every other frame */
     if (frameCount % 2 === 0) trail.push(pos);
