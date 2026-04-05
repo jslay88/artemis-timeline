@@ -62,9 +62,13 @@ const timelineTrack = document.querySelector<HTMLElement>(".timeline-track");
 const timelineTrackLine = document.querySelector<HTMLElement>(".timeline-track__line");
 const timelineList  = document.getElementById("timeline");
 
+let lastTrackHeight = 0;
 function syncTrackHeight(): void {
-  if (timelineTrack && timelineList) {
-    timelineTrack.style.height = `${timelineList.scrollHeight}px`;
+  if (!timelineTrack || !timelineList) return;
+  const h = timelineList.scrollHeight;
+  if (h !== lastTrackHeight) {
+    timelineTrack.style.height = `${h}px`;
+    lastTrackHeight = h;
   }
 }
 
@@ -212,6 +216,7 @@ if (distCanvas) {
    ══════════════════════════════════════════════ */
 const scrollEl = document.querySelector(".timeline-scroll");
 let userScrolledAt = 0;
+let lastCurrentRow: HTMLElement | undefined;
 const SCROLL_PAUSE_MS = 15_000;
 const mobileQuery = window.matchMedia("(max-width: 680px)");
 
@@ -291,49 +296,63 @@ function updateDashboard() {
   speedChart?.setNeedle(metHours);
   distChart?.setNeedle(metHours);
 
-  // ── Timeline marker ──
-  syncTrackHeight();
-  if (timelineNow) {
-    const nowPx = computeNowPx(state);
-    (timelineNow as HTMLElement).style.top = `${nowPx}px`;
-    if (timelineTrackLine) timelineTrackLine.style.height = `${nowPx}px`;
-    if (timelineNowLabel) {
-      if (state.phase === "pre")      timelineNowLabel.textContent = t("timeline.t0");
-      else if (state.phase === "complete") timelineNowLabel.textContent = t("timeline.end");
-      else timelineNowLabel.textContent = t("timeline.now");
+  // ── Timeline marker (skip continuous position updates on mobile to avoid scroll fighting) ──
+  if (!mobileQuery.matches) {
+    syncTrackHeight();
+    if (timelineNow) {
+      const nowPx = computeNowPx(state);
+      (timelineNow as HTMLElement).style.top = `${nowPx}px`;
+      if (timelineTrackLine) timelineTrackLine.style.height = `${nowPx}px`;
     }
   }
-
-  // ── Timeline row states ──
-  for (const row of timelineRows) {
-    row.classList.remove("timeline-row--past", "timeline-row--current",
-                         "timeline-row--future", "timeline-row--next");
+  if (timelineNowLabel) {
+    if (state.phase === "pre")      timelineNowLabel.textContent = t("timeline.t0");
+    else if (state.phase === "complete") timelineNowLabel.textContent = t("timeline.end");
+    else timelineNowLabel.textContent = t("timeline.now");
   }
+
+  // ── Timeline row states (only update when the current event changes) ──
+  let newCurrentEl: HTMLElement | undefined;
 
   if (state.phase === "pre") {
-    for (const row of timelineRows) row.classList.add("timeline-row--future");
-    sortedRows[0]?.el.classList.replace("timeline-row--future", "timeline-row--next");
+    newCurrentEl = undefined;
   } else if (state.phase === "complete") {
-    for (const row of timelineRows) row.classList.add("timeline-row--past");
-    const last = sortedRows[sortedRows.length - 1]?.el;
-    last?.classList.replace("timeline-row--past", "timeline-row--current");
+    newCurrentEl = sortedRows[sortedRows.length - 1]?.el;
   } else {
     const mh = state.metHours;
-    let currentEl = sortedRows[0]?.el;
-    for (const { el, h } of sortedRows) { if (h <= mh + 1e-6) currentEl = el; }
+    newCurrentEl = sortedRows[0]?.el;
+    for (const { el, h } of sortedRows) { if (h <= mh + 1e-6) newCurrentEl = el; }
+  }
+
+  if (newCurrentEl !== lastCurrentRow) {
+    lastCurrentRow = newCurrentEl;
     for (const row of timelineRows) {
-      const rh = parseFloat(row.dataset.metHours ?? "");
-      if (!Number.isFinite(rh)) continue;
-      if (rh < mh - 1e-3)   row.classList.add("timeline-row--past");
-      else if (row === currentEl) row.classList.add("timeline-row--current");
-      else                   row.classList.add("timeline-row--future");
+      row.classList.remove("timeline-row--past", "timeline-row--current",
+                           "timeline-row--future", "timeline-row--next");
     }
-    if (currentEl && !mobileQuery.matches && Date.now() - userScrolledAt > SCROLL_PAUSE_MS) {
-      const rect = currentEl.getBoundingClientRect();
-      const container = scrollEl?.getBoundingClientRect();
-      if (container && (rect.top < container.top || rect.bottom > container.bottom)) {
-        currentEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (state.phase === "pre") {
+      for (const row of timelineRows) row.classList.add("timeline-row--future");
+      sortedRows[0]?.el.classList.replace("timeline-row--future", "timeline-row--next");
+    } else if (state.phase === "complete") {
+      for (const row of timelineRows) row.classList.add("timeline-row--past");
+      newCurrentEl?.classList.replace("timeline-row--past", "timeline-row--current");
+    } else {
+      const mh = state.metHours;
+      for (const row of timelineRows) {
+        const rh = parseFloat(row.dataset.metHours ?? "");
+        if (!Number.isFinite(rh)) continue;
+        if (rh < mh - 1e-3)   row.classList.add("timeline-row--past");
+        else if (row === newCurrentEl) row.classList.add("timeline-row--current");
+        else                   row.classList.add("timeline-row--future");
       }
+    }
+  }
+
+  if (newCurrentEl && !mobileQuery.matches && Date.now() - userScrolledAt > SCROLL_PAUSE_MS) {
+    const rect = newCurrentEl.getBoundingClientRect();
+    const container = scrollEl?.getBoundingClientRect();
+    if (container && (rect.top < container.top || rect.bottom > container.bottom)) {
+      newCurrentEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   }
 }
