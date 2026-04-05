@@ -46,43 +46,40 @@
       <!-- ─── Main content ─── -->
       <div class="main-content">
 
-        <!-- 3D orbit view -->
-        <div class="orbit-panel" id="orbit-wrap" aria-label="3D spacecraft trajectory">
-          <canvas id="orbit-canvas"></canvas>
-          <button
-            type="button"
-            class="orbit-fullscreen-btn"
-            id="orbit-fullscreen"
-            data-i18n-title="orbit.fullscreenTip"
-            title="Toggle fullscreen"
-            data-i18n-label="orbit.fullscreenTip"
-            aria-label="Toggle fullscreen"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"
-                stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
-              />
-            </svg>
-          </button>
-          <!-- Phase overlay on orbit view -->
-          <div class="orbit-phase-overlay" id="orbit-phase-overlay" aria-hidden="true">
-            <span class="orbit-phase-label" id="orbit-phase-label">—</span>
+        <!-- ─── Primary panels (orbit + stream) ─── -->
+        <div class="main-panels">
+
+          <!-- 3D orbit view -->
+          <div class="orbit-panel" id="orbit-wrap" aria-label="3D spacecraft trajectory">
+            <canvas id="orbit-canvas"></canvas>
+            <button
+              type="button"
+              class="orbit-fullscreen-btn"
+              id="orbit-fullscreen"
+              data-i18n-title="orbit.fullscreenTip"
+              title="Toggle fullscreen"
+              data-i18n-label="orbit.fullscreenTip"
+              aria-label="Toggle fullscreen"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"
+                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <!-- Phase overlay on orbit view -->
+            <div class="orbit-phase-overlay" id="orbit-phase-overlay" aria-hidden="true">
+              <span class="orbit-phase-label" id="orbit-phase-label">—</span>
+            </div>
           </div>
-        </div>
 
-        <!-- ─── Resize gutter ─── -->
-        <div class="resize-gutter" id="resize-gutter" aria-hidden="true"></div>
-
-        <!-- ─── Side panel ─── -->
-        <aside class="side-panel" role="complementary" aria-label="Mission data">
-
-          <!-- Live stream (always-on, muted autoplay) -->
+          <!-- Live stream -->
           <section class="stream-section" aria-label="NASA live broadcast">
-            <h2 class="panel-label">
-              <span data-i18n="sidebar.live">LIVE COVERAGE</span>
-              <span class="panel-label__sub live-dot-label" aria-hidden="true">● <span data-i18n="sidebar.nasaTv">NASA TV</span></span>
-            </h2>
+            <div class="stream-header">
+              <span class="stream-header__label" data-i18n="sidebar.live">LIVE COVERAGE</span>
+              <span class="stream-header__dot live-dot-label" aria-hidden="true">● <span data-i18n="sidebar.nasaTv">NASA TV</span></span>
+            </div>
             <div class="stream-wrap">
               <iframe
                 src="https://www.youtube.com/embed/m3kR2KK8TEs?autoplay=1&mute=1&rel=0&modestbranding=1&controls=1"
@@ -93,6 +90,14 @@
               ></iframe>
             </div>
           </section>
+
+        </div><!-- .main-panels -->
+
+        <!-- ─── Resize gutter ─── -->
+        <div class="resize-gutter" id="resize-gutter" aria-hidden="true"></div>
+
+        <!-- ─── Side panel ─── -->
+        <aside class="side-panel" role="complementary" aria-label="Mission data">
 
           <!-- Telemetry readouts -->
           <section class="telem-section" aria-label="Live telemetry" role="status" aria-live="polite">

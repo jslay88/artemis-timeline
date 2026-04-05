@@ -26,7 +26,7 @@
 
   --topbar-h:    44px;
   --statusbar-h: 36px;
-  --side-w:      340px;
+  --side-w:      300px;
 }
 
 /* ─── Reset & base ───────────────────────────────────────── */
@@ -187,11 +187,21 @@ html, body {
 .resize-gutter:hover,
 .resize-gutter--active { background: var(--accent); }
 
+/* ─── Main panels (orbit + stream stacked) ───────────────── */
+.main-panels {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* ─── Orbit panel ────────────────────────────────────────── */
 .orbit-panel {
   position: relative;
   background: #000;
   overflow: hidden;
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 #orbit-canvas {
@@ -371,8 +381,33 @@ html, body {
   letter-spacing: 0.06em;
 }
 
-/* Live stream */
-.stream-section { border-bottom: 1px solid var(--border); flex-shrink: 0; }
+/* Live stream (main panel) */
+.stream-section {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+
+.stream-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--text-3);
+  text-transform: uppercase;
+  background: var(--bg-base);
+  flex-shrink: 0;
+}
+.stream-header__dot {
+  color: var(--accent);
+  animation: blink 1.2s ease infinite;
+}
 
 .live-dot-label {
   color: var(--accent);
@@ -381,9 +416,9 @@ html, body {
 
 .stream-wrap {
   position: relative;
-  aspect-ratio: 16/9;
   background: #000;
-  width: 100%;
+  flex: 1 1 0;
+  min-height: 0;
 }
 .stream-wrap iframe {
   position: absolute;
@@ -772,13 +807,16 @@ html, body {
   :root { --side-w: 100vw; }
   .main-content {
     grid-template-columns: 1fr;
-    grid-template-rows: 45vh 1fr;
+    grid-template-rows: 1fr auto;
   }
+  .main-panels { flex-direction: column; }
+  .main-panels > .orbit-panel { flex: 1 1 50%; }
+  .main-panels > .stream-section { flex: 1 1 50%; }
   .resize-gutter { display: none; }
   .side-panel { border-left: none; border-top: 1px solid var(--border); }
   .status-bar__right { display: none; }
   .topbar__program { display: none; }
 }
 @media (max-width: 900px) and (min-width: 681px) {
-  :root { --side-w: 280px; }
+  :root { --side-w: 260px; }
 }
