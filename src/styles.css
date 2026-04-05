@@ -25,7 +25,7 @@
   --font-mono:   "IBM Plex Mono", "Courier New", monospace;
 
   --topbar-h:    44px;
-  --statusbar-h: 32px;
+  --statusbar-h: 36px;
   --side-w:      340px;
 }
 
@@ -73,7 +73,7 @@ html, body {
 
 .topbar__program {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.12em;
   color: var(--text-2);
@@ -83,7 +83,7 @@ html, body {
 
 .topbar__status {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.1em;
   color: var(--green);
@@ -97,7 +97,7 @@ html, body {
 }
 .topbar__met-label {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   color: var(--text-3);
 }
@@ -283,13 +283,15 @@ html, body {
   min-height: 0;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+  container-type: inline-size;
+  container-name: side;
 }
 .side-panel::-webkit-scrollbar { width: 4px; }
 .side-panel::-webkit-scrollbar-thumb { background: var(--border); }
 
 .panel-label {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: clamp(9px, 2.8cqi, 13px);
   font-weight: 600;
   letter-spacing: 0.14em;
   color: var(--text-3);
@@ -302,7 +304,7 @@ html, body {
   flex-shrink: 0;
 }
 .panel-label__unit { font-weight: 400; color: var(--text-4); letter-spacing: 0.04em; }
-.panel-label__sub  { font-size: 8px; color: var(--accent); letter-spacing: 0.1em; }
+.panel-label__sub  { font-size: clamp(8px, 2.4cqi, 12px); color: var(--accent); letter-spacing: 0.1em; }
 
 /* Telemetry */
 .telem-section { border-bottom: 1px solid var(--border); flex-shrink: 0; }
@@ -313,31 +315,30 @@ html, body {
 }
 
 .telem-item {
-  padding: 10px 12px 8px;
+  padding: clamp(10px, 3cqi, 16px) clamp(12px, 3.5cqi, 20px) clamp(8px, 2.4cqi, 14px);
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.telem-item:nth-child(2),
-.telem-item:nth-child(4) { border-right: none; }
+.telem-item:nth-child(even) { border-right: none; }
+.telem-item:nth-child(n+3) { border-bottom: none; }
 .telem-item--wide {
-  grid-column: 1 / -1;
-  border-right: none;
   border-bottom: none;
 }
 
 .telem-item__label {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: clamp(9px, 2.6cqi, 13px);
   font-weight: 600;
   letter-spacing: 0.16em;
   color: var(--text-3);
   text-transform: uppercase;
+  white-space: nowrap;
 }
 .telem-item__value {
-  font-size: 20px;
+  font-size: clamp(22px, 6.5cqi, 36px);
   font-weight: 300;
   color: var(--text);
   line-height: 1.1;
@@ -346,13 +347,13 @@ html, body {
 }
 .telem-item__value--mono {
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: clamp(16px, 5cqi, 28px);
   font-weight: 500;
   letter-spacing: 0.02em;
 }
 .telem-item__unit {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: clamp(9px, 2.8cqi, 14px);
   color: var(--text-3);
   letter-spacing: 0.06em;
 }
@@ -467,7 +468,7 @@ html, body {
 .event__inner { display: flex; flex-direction: column; gap: 1px; }
 
 .event__name {
-  font-size: 12.5px;
+  font-size: clamp(13px, 3.8cqi, 18px);
   font-weight: 500;
   color: var(--text-2);
   white-space: nowrap;
@@ -477,7 +478,7 @@ html, body {
 }
 .event__met {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: clamp(10px, 3cqi, 15px);
   color: var(--text-3);
   letter-spacing: 0.03em;
   transition: color 0.15s;
@@ -495,7 +496,7 @@ html, body {
 
 .event__phase-tag {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: clamp(10px, 3cqi, 15px);
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -556,14 +557,14 @@ html, body {
 }
 .status-bar__lbl {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 0.16em;
   color: var(--text-3);
   text-transform: uppercase;
 }
 .status-bar__val {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-2);
   white-space: nowrap;
   overflow: hidden;
