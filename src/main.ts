@@ -221,6 +221,27 @@ if (scrollEl) {
   scrollEl.addEventListener("pointerdown", () => { userScrolledAt = Date.now(); });
 }
 
+/* ══════════════════════════════════════════════
+   Mobile layout: move footer into sidebar scroll
+   ══════════════════════════════════════════════ */
+{
+  const dashboard = document.querySelector<HTMLElement>(".dashboard");
+  const sidePanel = document.querySelector<HTMLElement>(".side-panel");
+  const statusBar = document.querySelector<HTMLElement>(".status-bar");
+
+  function applyMobileLayout(): void {
+    if (!dashboard || !sidePanel || !statusBar) return;
+    if (mobileQuery.matches) {
+      sidePanel.appendChild(statusBar);
+    } else {
+      dashboard.appendChild(statusBar);
+    }
+  }
+
+  applyMobileLayout();
+  mobileQuery.addEventListener("change", applyMobileLayout);
+}
+
 function updateDashboard() {
   const state = getMissionState();
   const metHours = state.phase === "pre"      ? 0
