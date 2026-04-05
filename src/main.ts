@@ -6,8 +6,9 @@ import {
   formatLocaleDateTime,
   LAUNCH,
   SPLASH,
-} from "./mission.js";
-import { createOrbitScene } from "./orbit-scene.js";
+  type MissionState,
+} from "./mission.ts";
+import { createOrbitScene } from "./orbit-scene.ts";
 import {
   initI18n,
   t,
@@ -15,8 +16,7 @@ import {
   getLocale,
   getLocales,
   onLocaleChange,
-  applyI18nToDom,
-} from "./i18n.js";
+} from "./i18n.ts";
 
 /* ——— i18n bootstrap + locale picker ——— */
 
@@ -35,23 +35,29 @@ initI18n();
       if (code === getLocale()) opt.selected = true;
       sel.appendChild(opt);
     }
-    sel.addEventListener("change", () => setLocale(sel.value));
+    sel.addEventListener("change", (): void => {
+      setLocale(sel.value);
+    });
     picker.appendChild(sel);
-    onLocaleChange((code) => { sel.value = code; });
+    onLocaleChange((code: string) => {
+      sel.value = code;
+    });
   }
 }
 
 /* ——— Enrich timeline with local times ——— */
 
 function enrichTimelineLocale() {
-  const rows = document.querySelectorAll(".timeline-row[data-met-hours]");
+  const rows = document.querySelectorAll<HTMLElement>(
+    ".timeline-row[data-met-hours]"
+  );
   for (const row of rows) {
-    const h = parseFloat(row.dataset.metHours, 10);
+    const h = parseFloat(row.dataset.metHours ?? "");
     if (!Number.isFinite(h)) continue;
     const when = new Date(LAUNCH.getTime() + h * 3600000);
     const local = formatLocaleDateTime(when);
 
-    const metEl = row.querySelector(".event__met");
+    const metEl = row.querySelector<HTMLElement>(".event__met");
     if (metEl) {
       if (!metEl.dataset.chart) metEl.dataset.chart = metEl.textContent.trim();
       metEl.replaceChildren();
@@ -66,7 +72,7 @@ function enrichTimelineLocale() {
       metEl.appendChild(sub);
     }
 
-    const metaEl = row.querySelector(".phase-block__meta");
+    const metaEl = row.querySelector<HTMLElement>(".phase-block__meta");
     if (metaEl) {
       const metaKey = row.dataset.i18nMeta;
       metaEl.replaceChildren();
@@ -97,10 +103,11 @@ enrichTimelineLocale();
 
 /* ——— Background starfield canvas ——— */
 
-const canvas = document.getElementById("starfield");
-const ctx = canvas.getContext("2d");
+const canvas = document.getElementById("starfield") as HTMLCanvasElement;
+const ctx = canvas.getContext("2d")!;
 
-let stars = [];
+type Star = { x: number; y: number; z: number; s: number };
+let stars: Star[] = [];
 let w = 0;
 let h = 0;
 let raf = 0;
@@ -127,12 +134,12 @@ function initStars() {
   }
 }
 
-function tick(t) {
+function tick(time: number) {
   if (prefersReducedMotion) { drawStatic(); return; }
   ctx.fillStyle = "#03060d";
   ctx.fillRect(0, 0, w, h);
 
-  const twinkle = t * 0.0008;
+  const twinkle = time * 0.0008;
   for (let i = 0; i < stars.length; i++) {
     const st = stars[i];
     const pulse = 0.55 + 0.45 * Math.sin(twinkle + i * 0.7);
@@ -177,9 +184,9 @@ else drawStatic();
 
 /* ——— Scroll reveal ——— */
 
-const animated = document.querySelectorAll("[data-animate]");
+const animated = document.querySelectorAll<HTMLElement>("[data-animate]");
 const io = new IntersectionObserver(
-  (entries) => {
+  (entries: IntersectionObserverEntry[]) => {
     for (const e of entries) {
       if (e.isIntersecting) { e.target.classList.add("is-visible"); io.unobserve(e.target); }
     }
@@ -199,8 +206,10 @@ hintBtn?.addEventListener("click", () => {
 });
 
 if (!prefersReducedMotion) {
-  document.querySelectorAll(".timeline > li").forEach((el, i) => {
-    const target = el.querySelector("[data-animate]") || (el.hasAttribute("data-animate") ? el : null);
+  document.querySelectorAll<HTMLElement>(".timeline > li").forEach((el, i) => {
+    const target =
+      el.querySelector<HTMLElement>("[data-animate]") ||
+      (el.hasAttribute("data-animate") ? el : null);
     if (target) target.style.transitionDelay = `${Math.min(i * 0.035, 0.55)}s`;
   });
 }
@@ -213,20 +222,22 @@ const missionHudSubLabel = document.getElementById("mission-hud-sub-label");
 const missionHudSubValue = document.getElementById("mission-hud-sub-value");
 const timelineNow = document.getElementById("timeline-now");
 const timelineNowLabel = document.getElementById("timeline-now-label");
-const timelineRows = [...document.querySelectorAll(".timeline-row")];
+const timelineRows = [
+  ...document.querySelectorAll<HTMLElement>(".timeline-row"),
+];
 
-const sortedRows = timelineRows
-  .map((el) => ({ el, h: parseFloat(el.dataset.metHours, 10) }))
+const sortedRows: Array<{ el: HTMLElement; h: number }> = timelineRows
+  .map((el) => ({ el, h: parseFloat(el.dataset.metHours ?? "") }))
   .filter((x) => Number.isFinite(x.h))
   .sort((a, b) => a.h - b.h);
 
 const TOTAL_MET_HOURS = (SPLASH.getTime() - LAUNCH.getTime()) / 3600000;
 
-function rowMidY(el) {
+function rowMidY(el: HTMLElement) {
   return el.offsetTop + el.offsetHeight / 2;
 }
 
-function computeNowPx(state) {
+function computeNowPx(state: MissionState) {
   if (sortedRows.length === 0) return 0;
 
   if (state.phase === "pre") {
@@ -313,7 +324,7 @@ function updateMissionUi() {
     let currentEl = sortedRows[0]?.el;
     for (const { el, h } of sortedRows) { if (h <= mh + 1e-6) currentEl = el; }
     for (const row of timelineRows) {
-      const rh = parseFloat(row.dataset.metHours, 10);
+      const rh = parseFloat(row.dataset.metHours ?? "");
       if (!Number.isFinite(rh)) continue;
       if (rh < mh - 1e-3) row.classList.add("timeline-row--past");
       else if (row === currentEl) row.classList.add("timeline-row--current");
@@ -327,9 +338,9 @@ setInterval(updateMissionUi, 250);
 
 /* ——— 3D orbit scene ——— */
 
-const orbitCanvas = document.getElementById("orbit-canvas");
+const orbitCanvas = document.getElementById("orbit-canvas") as HTMLCanvasElement | null;
 const fullscreenBtn = document.getElementById("orbit-fullscreen");
-let orbitApi = null;
+let orbitApi: ReturnType<typeof createOrbitScene> | null = null;
 
 if (orbitCanvas) {
   try {

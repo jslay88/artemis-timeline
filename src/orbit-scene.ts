@@ -5,7 +5,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import gsap from "gsap";
-import { t } from "./i18n.js";
+import { t } from "./i18n.ts";
 
 /* ════════════════════════════════════════════
    Configuration
@@ -75,11 +75,17 @@ const PATH_POINTS = [
 const curve = new THREE.CatmullRomCurve3(PATH_POINTS, true, "catmullrom", 0.15);
 
 /** Map mission MET-hours to curve parameter u (0 at TLI, 1 at splashdown). */
-function metToU(metHours) {
+function metToU(metHours: number): number {
   return Math.min(1, Math.max(0, (metHours - TLI_MET) / TRAJ_DURATION));
 }
 
-const MILESTONES = [
+interface Milestone {
+  key: string;
+  metHours: number;
+  color: number;
+}
+
+const MILESTONES: Milestone[] = [
   { key: "ms.launch", metHours: 0, color: 0x4ade80 },
   { key: "ms.tli", metHours: 25.617, color: 0x60a5fa },
   { key: "ms.lunarSoi", metHours: 103.983, color: 0xa78bfa },
@@ -89,7 +95,7 @@ const MILESTONES = [
   { key: "ms.splashdown", metHours: 217.767, color: 0xef4444 },
 ];
 
-export function sampleCraftPosition(u) {
+export function sampleCraftPosition(u: number): THREE.Vector3 {
   return curve.getPointAt(Math.min(1, Math.max(0, u)));
 }
 
@@ -167,7 +173,12 @@ void main() {
    Orion Spacecraft
    ════════════════════════════════════════════ */
 
-function buildOrion() {
+interface OrionCraft {
+  group: THREE.Group;
+  engineGlow: THREE.Mesh;
+}
+
+function buildOrion(): OrionCraft {
   const group = new THREE.Group();
 
   const whiteMat = new THREE.MeshStandardMaterial({
@@ -231,7 +242,13 @@ function buildOrion() {
    Particle trail behind spacecraft
    ════════════════════════════════════════════ */
 
-function createTrailSystem(scene) {
+interface TrailSystem {
+  push: (pos: THREE.Vector3) => void;
+  tick: () => void;
+  dispose: () => void;
+}
+
+function createTrailSystem(scene: THREE.Scene): TrailSystem {
   const COUNT = 120;
   const geo = new THREE.BufferGeometry();
   const positions = new Float32Array(COUNT * 3);
@@ -278,7 +295,7 @@ function createTrailSystem(scene) {
 
   let head = 0;
 
-  function push(pos) {
+  function push(pos: THREE.Vector3): void {
     const i3 = head * 3;
     positions[i3] = pos.x;
     positions[i3 + 1] = pos.y;
@@ -288,7 +305,7 @@ function createTrailSystem(scene) {
     head = (head + 1) % COUNT;
   }
 
-  function tick() {
+  function tick(): void {
     for (let i = 0; i < COUNT; i++) {
       alphas[i] *= 0.96;
       sizes[i] *= 0.985;
@@ -305,7 +322,7 @@ function createTrailSystem(scene) {
    Stars with size variation
    ════════════════════════════════════════════ */
 
-function createStars(count = 8000) {
+function createStars(count: number = 8000): THREE.Points {
   const geo = new THREE.BufferGeometry();
   const verts = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
@@ -361,12 +378,20 @@ function createStars(count = 8000) {
    Main Scene
    ════════════════════════════════════════════ */
 
-/**
- * @param {HTMLCanvasElement} canvas
- * @param {{ getProgress: () => number }} clock
- */
-export function createOrbitScene(canvas, clock) {
-  const wrap = canvas.parentElement;
+export interface OrbitClock {
+  getProgress: () => number;
+}
+
+export interface OrbitSceneApi {
+  resize: () => void;
+  toggleFullscreen: () => void;
+  flyTo: (target: THREE.Vector3) => void;
+  updateLabels: () => void;
+  dispose: () => void;
+}
+
+export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): OrbitSceneApi {
+  const wrap = canvas.parentElement!;
 
   /* ——— Renderer ——— */
   const renderer = new THREE.WebGLRenderer({
@@ -411,7 +436,7 @@ export function createOrbitScene(canvas, clock) {
   controls.maxPolarAngle = Math.PI * 0.88;
   controls.minPolarAngle = Math.PI * 0.08;
 
-  let autoRotateTimer;
+  let autoRotateTimer: ReturnType<typeof setTimeout>;
   controls.addEventListener("start", () => {
     controls.autoRotate = false;
     clearTimeout(autoRotateTimer);
@@ -449,7 +474,7 @@ export function createOrbitScene(canvas, clock) {
   });
 
   const base = import.meta.env.BASE_URL;
-  function loadTex(path, cb) {
+  function loadTex(path: string, cb: (tex: THREE.Texture) => void): void {
     loader.load(`${base}textures/${path}`, (tex) => {
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
@@ -526,7 +551,7 @@ export function createOrbitScene(canvas, clock) {
   scene.add(clouds);
 
   /* Atmosphere glow (inner rim) */
-  const makeAtm = (radius, color, intensity, power, side) => {
+  const makeAtm = (radius: number, color: number, intensity: number, power: number, side: THREE.Side): THREE.Mesh => {
     const mat = new THREE.ShaderMaterial({
       vertexShader: ATM_VERT,
       fragmentShader: ATM_FRAG,
@@ -622,8 +647,20 @@ export function createOrbitScene(canvas, clock) {
      Milestones — dots, sprites, labels, click-to-fly
      ════════════════════════════════════════════ */
 
-  const milestoneMeshes = [];
-  const milestoneLabels = [];
+  interface MilestoneMesh {
+    dot: THREE.Mesh;
+    ring: THREE.Mesh;
+    pos: THREE.Vector3;
+    data: Milestone;
+  }
+  interface Label {
+    el: HTMLElement;
+    key: string;
+    worldPos: THREE.Vector3;
+  }
+
+  const milestoneMeshes: MilestoneMesh[] = [];
+  const milestoneLabels: Label[] = [];
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
 
@@ -656,7 +693,7 @@ export function createOrbitScene(canvas, clock) {
   }
 
   /* Body labels */
-  const bodyLabels = [];
+  const bodyLabels: Label[] = [];
   for (const { key, worldPos, color } of [
     { key: "body.earth", worldPos: new THREE.Vector3(0, EARTH_RADIUS + 0.5, 0), color: "#4ad4ff" },
     { key: "body.moon", worldPos: MOON_POS.clone().add(new THREE.Vector3(0, MOON_RADIUS + 0.4, 0)), color: "#c8cdd0" },
@@ -723,7 +760,7 @@ export function createOrbitScene(canvas, clock) {
     }
   });
 
-  function flyTo(target) {
+  function flyTo(target: THREE.Vector3): void {
     controls.autoRotate = false;
     clearTimeout(autoRotateTimer);
 
@@ -780,11 +817,11 @@ export function createOrbitScene(canvas, clock) {
     craft.quaternion.setFromUnitVectors(craftForward, tangent);
 
     /* Engine glow pulse */
-    engineGlow.material.opacity = 0.6 + 0.3 * Math.sin(now * 0.006);
+    (engineGlow.material as THREE.MeshBasicMaterial).opacity = 0.6 + 0.3 * Math.sin(now * 0.006);
 
     /* Position marker */
     posMarker.position.copy(pos);
-    posMarker.material.opacity = 0.15 + 0.2 * Math.sin(now * 0.004);
+    (posMarker.material as THREE.MeshBasicMaterial).opacity = 0.15 + 0.2 * Math.sin(now * 0.004);
     posMarker.scale.setScalar(1 + 0.35 * Math.sin(now * 0.003));
 
     /* Trail particles — emit every other frame */
@@ -868,10 +905,11 @@ export function createOrbitScene(canvas, clock) {
       for (const { el } of bodyLabels) el.remove();
       tooltip.remove();
       scene.traverse((obj) => {
-        if (obj.geometry) obj.geometry.dispose();
-        if (obj.material) {
-          if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
-          else obj.material.dispose();
+        const mesh = obj as THREE.Mesh;
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) mesh.material.forEach((m: THREE.Material) => m.dispose());
+          else mesh.material.dispose();
         }
       });
     },
