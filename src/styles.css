@@ -796,6 +796,7 @@ html, body {
     border-top: 1px solid var(--border);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   /* ── Side panel: single continuous scroll on mobile ── */
@@ -826,7 +827,8 @@ html, body {
   /* ── Status bar / footer (lives inside sidebar on mobile) ── */
   .status-bar {
     flex-wrap: wrap;
-    padding: 8px 10px;
+    flex-shrink: 0;
+    padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
     gap: 4px 10px;
     border-top: 1px solid var(--border);
   }
