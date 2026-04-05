@@ -63,6 +63,8 @@ const timelineTrackLine = document.querySelector<HTMLElement>(".timeline-track__
 const timelineList  = document.getElementById("timeline");
 
 let lastTrackHeight = 0;
+let lastNowPx = -1;
+
 function syncTrackHeight(): void {
   if (!timelineTrack || !timelineList) return;
   const h = timelineList.scrollHeight;
@@ -296,11 +298,12 @@ function updateDashboard() {
   speedChart?.setNeedle(metHours);
   distChart?.setNeedle(metHours);
 
-  // ── Timeline marker (skip continuous position updates on mobile to avoid scroll fighting) ──
-  if (!mobileQuery.matches) {
-    syncTrackHeight();
-    if (timelineNow) {
-      const nowPx = computeNowPx(state);
+  // ── Timeline marker (only write DOM when the value actually changes) ──
+  syncTrackHeight();
+  if (timelineNow) {
+    const nowPx = Math.round(computeNowPx(state));
+    if (nowPx !== lastNowPx) {
+      lastNowPx = nowPx;
       (timelineNow as HTMLElement).style.top = `${nowPx}px`;
       if (timelineTrackLine) timelineTrackLine.style.height = `${nowPx}px`;
     }
