@@ -3,377 +3,336 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Artemis II — Mission Timeline</title>
+    <title>Artemis II — Mission Monitoring</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
   </head>
   <body>
-    <canvas id="starfield" aria-hidden="true"></canvas>
-    <div class="grain" aria-hidden="true"></div>
+    <!-- ═══ Dashboard ═══ -->
+    <div class="dashboard">
 
-    <nav class="locale-picker" id="locale-picker" aria-label="Language"></nav>
-
-    <aside class="mission-hud" id="mission-hud" role="status" aria-live="polite">
-      <div class="mission-hud__row">
-        <span class="mission-hud__k" data-i18n="hud.missionClock">Mission clock</span>
-        <span class="mission-hud__v" id="mission-hud-phase">—</span>
-      </div>
-      <div class="mission-hud__row">
-        <span class="mission-hud__k" data-i18n="hud.met">MET</span>
-        <span class="mission-hud__v mission-hud__v--met" id="mission-hud-met">00/00:00:00</span>
-      </div>
-      <div class="mission-hud__row mission-hud__row--sub" id="mission-hud-sub">
-        <span class="mission-hud__k" id="mission-hud-sub-label">—</span>
-        <span class="mission-hud__v" id="mission-hud-sub-value">—</span>
-      </div>
-    </aside>
-
-    <header class="hero">
-      <p class="hero__badge" data-i18n="hero.badge">NASA · Artemis II</p>
-      <h1 class="hero__title" data-i18n="hero.title">Overview Timeline</h1>
-      <p class="hero__subtitle" data-i18n="hero.subtitle">
-        Crewed lunar flyby · Mission Elapsed Time (MET) · Public overview
-      </p>
-      <div class="hero__launch" data-animate>
-        <span class="hero__launch-label" data-i18n="hero.launchLabel">Launch</span>
-        <time class="hero__launch-time" datetime="2026-04-01T18:35:12-04:00"
-          >April 1, 2026 · 6:35:12 p.m. EDT</time
-        >
-      </div>
-      <div class="hero__orbit" id="orbit-wrap" aria-label="Schematic Earth–Moon trajectory">
-        <canvas id="orbit-canvas"></canvas>
-        <button
-          type="button"
-          class="orbit-fullscreen-btn"
-          id="orbit-fullscreen"
-          title="Toggle fullscreen"
-          aria-label="Toggle fullscreen"
-          data-i18n-title="orbit.fullscreen"
-          data-i18n-label="orbit.fullscreen"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </button>
-      </div>
-
-      <button type="button" class="scroll-hint" aria-label="Scroll to timeline">
-        <span data-i18n="hero.scrollHint">Timeline</span>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path
-            d="M12 5v14M7 14l5 5 5-5"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-      </button>
-    </header>
-
-    <main class="timeline-wrap">
-      <div class="timeline-axis" aria-hidden="true">
-        <div class="timeline-axis__line"></div>
-        <div class="timeline-axis__now" id="timeline-now" title="Current mission progress">
-          <span class="timeline-axis__now-dot" aria-hidden="true"></span>
-          <span class="timeline-axis__now-text" id="timeline-now-label">Now</span>
+      <!-- ─── Top bar ─── -->
+      <header class="topbar" role="banner">
+        <div class="topbar__left">
+          <span class="topbar__program">NASA · ARTEMIS II</span>
+          <span class="topbar__sep" aria-hidden="true">|</span>
+          <span class="topbar__status" id="mission-hud-phase">—</span>
         </div>
-      </div>
+        <div class="topbar__met" role="timer" aria-label="Mission Elapsed Time">
+          <span class="topbar__met-label">MET</span>
+          <span class="topbar__met-value" id="mission-hud-met">00/00:00:00</span>
+        </div>
+        <div class="topbar__right">
+          <nav class="locale-picker" id="locale-picker" aria-label="Language"></nav>
+        </div>
+      </header>
 
-      <ol class="timeline" id="timeline">
-        <!-- ═══ Liftoff ═══ MET 00/00:00 -->
-        <li class="phase-block timeline-row" data-phase="launch" data-met-hours="0" data-i18n-meta="phase.liftoff.meta">
-          <div class="phase-block__inner" data-animate>
-            <h2 class="phase-block__title" data-i18n="phase.liftoff.title">Liftoff</h2>
-            <p class="phase-block__meta">MET 00/00:00 · T+0</p>
-            <p class="phase-block__desc" data-i18n="phase.liftoff.desc">
-              Space Launch System ascent; Orion and ICPS inserted toward high Earth orbit and
-              translunar injection ground track per flight plan.
-            </p>
+      <!-- ─── Main content ─── -->
+      <div class="main-content">
+
+        <!-- 3D orbit view -->
+        <div class="orbit-panel" id="orbit-wrap" aria-label="3D spacecraft trajectory">
+          <canvas id="orbit-canvas"></canvas>
+          <button
+            type="button"
+            class="orbit-fullscreen-btn"
+            id="orbit-fullscreen"
+            title="Toggle fullscreen"
+            aria-label="Toggle fullscreen"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"
+                stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <!-- Phase overlay on orbit view -->
+          <div class="orbit-phase-overlay" id="orbit-phase-overlay" aria-hidden="true">
+            <span class="orbit-phase-label" id="orbit-phase-label">—</span>
           </div>
-        </li>
+        </div>
 
-        <!-- MET 0/03:24 · 0/04:52 -->
-        <li class="event timeline-row" data-animate data-met-hours="3.4">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">0/03:24 · 0/04:52 MET</span>
-            <h3 class="event__name" data-i18n="event.separation.name">Orion / ICPS spring separation · USS</h3>
-            <p class="event__detail" data-i18n="event.separation.detail">Stack separation and upper stage handover milestones.</p>
-          </div>
-        </li>
+        <!-- ─── Side panel ─── -->
+        <aside class="side-panel" role="complementary" aria-label="Mission data">
 
-        <!-- MET 0/05:02 -->
-        <li class="event timeline-row" data-animate data-met-hours="5.033">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">0/05:02 MET</span>
-            <h3 class="event__name" data-i18n="event.icpsDisposal.name">ICPS disposal burn</h3>
-            <p class="event__detail" data-i18n="event.icpsDisposal.detail">Upper stage disposal per mission rules of flight.</p>
-          </div>
-        </li>
+          <!-- Live stream (always-on, muted autoplay) -->
+          <section class="stream-section" aria-label="NASA live broadcast">
+            <h2 class="panel-label">
+              LIVE COVERAGE
+              <span class="panel-label__sub live-dot-label" aria-hidden="true">● NASA TV</span>
+            </h2>
+            <div class="stream-wrap">
+              <iframe
+                src="https://www.youtube.com/embed/m3kR2KK8TEs?autoplay=1&mute=1&rel=0&modestbranding=1&controls=1"
+                title="Artemis II NASA Livestream"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+                loading="lazy"
+              ></iframe>
+            </div>
+          </section>
 
-        <!-- ═══ High Earth Orbit ═══ -->
-        <li class="phase-block timeline-row" data-phase="heo" data-met-hours="14" data-i18n-meta="phase.heo.meta">
-          <div class="phase-block__inner" data-animate>
-            <h2 class="phase-block__title" data-i18n="phase.heo.title">High Earth Orbit</h2>
-            <p class="phase-block__meta">Systems checkout · crew ops · DPC</p>
-            <p class="phase-block__desc" data-i18n="phase.heo.desc">
-              HEO system checkouts, navigation exercises, attitude activities, and ground
-              coordination prior to translunar coast.
-            </p>
-          </div>
-        </li>
+          <!-- Telemetry readouts -->
+          <section class="telem-section" aria-label="Live telemetry" role="status" aria-live="polite">
+            <h2 class="panel-label">TELEMETRY</h2>
+            <div class="telem-grid">
+              <div class="telem-item">
+                <span class="telem-item__label">SPEED</span>
+                <span class="telem-item__value" id="tel-speed">—</span>
+                <span class="telem-item__unit">km/s</span>
+              </div>
+              <div class="telem-item">
+                <span class="telem-item__label">DISTANCE</span>
+                <span class="telem-item__value" id="tel-distance">—</span>
+                <span class="telem-item__unit">km</span>
+              </div>
+              <div class="telem-item">
+                <span class="telem-item__label">ALTITUDE</span>
+                <span class="telem-item__value" id="tel-altitude">—</span>
+                <span class="telem-item__unit">km</span>
+              </div>
+              <div class="telem-item telem-item--wide">
+                <span class="telem-item__label" id="mission-hud-sub-label">T+LAUNCH</span>
+                <span class="telem-item__value telem-item__value--mono" id="mission-hud-sub-value">—</span>
+              </div>
+            </div>
+          </section>
 
-        <!-- MET ~01/01:37 -->
-        <li class="event timeline-row" data-animate data-met-hours="25.617">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">~01/01:37 MET</span>
-            <h3 class="event__name" data-i18n="event.tli.name">Orion TLI</h3>
-            <p class="event__detail" data-i18n="event.tli.detail">Trans-lunar injection — departure toward the Moon.</p>
-          </div>
-        </li>
+          <!-- Velocity chart -->
+          <section class="chart-section">
+            <h2 class="panel-label">VELOCITY  <span class="panel-label__unit">km/s</span></h2>
+            <div class="chart-wrap">
+              <canvas id="chart-speed" aria-label="Spacecraft speed over mission time"></canvas>
+            </div>
+          </section>
 
-        <!-- MET ~02/00:07 -->
-        <li class="event timeline-row" data-animate data-met-hours="48.117">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">~02/00:07 MET</span>
-            <h3 class="event__name" data-i18n="event.otc1.name">OTC-1</h3>
-            <p class="event__detail" data-i18n="event.otc1.detail">First Orion translunar checkout sequence.</p>
-          </div>
-        </li>
+          <!-- Distance chart -->
+          <section class="chart-section">
+            <h2 class="panel-label">DISTANCE FROM EARTH  <span class="panel-label__unit">×1000 km</span></h2>
+            <div class="chart-wrap">
+              <canvas id="chart-distance" aria-label="Distance from Earth over mission time"></canvas>
+            </div>
+          </section>
 
-        <!-- ═══ Trans-Lunar Coast ═══ -->
-        <li class="phase-block timeline-row" data-phase="tl" data-met-hours="74" data-i18n-meta="phase.tl.meta">
-          <div class="phase-block__inner" data-animate>
-            <h2 class="phase-block__title" data-i18n="phase.tl.title">Trans-Lunar Coast</h2>
-            <p class="phase-block__meta">OTC sequences · dock cam · comm demos</p>
-            <p class="phase-block__desc" data-i18n="phase.tl.desc">
-              Multi-day coast with translunar operations, imagery, DFTOs, and navigation
-              calibrations en route to lunar sphere of influence.
-            </p>
-          </div>
-        </li>
+          <!-- Mission timeline (scrollable) -->
+          <section class="timeline-section">
+            <h2 class="panel-label">
+              MISSION TIMELINE
+              <span class="panel-label__sub" id="timeline-now-label">NOW</span>
+            </h2>
+            <div class="timeline-scroll">
+              <div class="timeline-track" aria-hidden="true">
+                <div class="timeline-track__line"></div>
+                <div class="timeline-track__now" id="timeline-now">
+                  <span class="timeline-track__dot"></span>
+                </div>
+              </div>
+              <ol class="timeline" id="timeline">
 
-        <!-- MET 4/05:23 -->
-        <li class="event timeline-row" data-animate data-met-hours="101.383">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">4/05:23 MET</span>
-            <h3 class="event__name" data-i18n="event.otc3.name">OTC-3</h3>
-            <p class="event__detail" data-i18n="event.otc3.detail">Translunar checkout continuation.</p>
-          </div>
-        </li>
+                <!-- Liftoff -->
+                <li class="event timeline-row timeline-row--phase" data-phase="launch" data-met-hours="0">
+                  <div class="event__inner">
+                    <span class="event__phase-tag" data-i18n="phase.liftoff.title">Liftoff</span>
+                    <span class="event__met">MET +00/00:00</span>
+                  </div>
+                </li>
 
-        <!-- MET 4/06:59 -->
-        <li class="event timeline-row" data-animate data-met-hours="103.983">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">4/06:59 MET</span>
-            <h3 class="event__name" data-i18n="event.lunarSoi.name">Lunar SOI entry</h3>
-            <p class="event__detail" data-i18n="event.lunarSoi.detail">Enter the Moon's sphere of influence.</p>
-          </div>
-        </li>
+                <li class="event timeline-row" data-met-hours="3.4">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.separation.name">Orion / ICPS separation</span>
+                    <span class="event__met">0/03:24 MET</span>
+                  </div>
+                </li>
 
-        <!-- MET 04/21:02 — Apollo 13 benchmark -->
-        <li class="event timeline-row" data-animate data-met-hours="117.033">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">04/21:02 MET</span>
-            <h3 class="event__name" data-i18n="event.apollo13.name">Apollo 13 distance benchmark</h3>
-            <p class="event__detail" data-i18n="event.apollo13.detail">
-              Artemis II exceeds the farthest distance from Earth reached by the Apollo 13 crew.
-            </p>
-          </div>
-        </li>
+                <li class="event timeline-row" data-met-hours="5.033">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.icpsDisposal.name">ICPS disposal burn</span>
+                    <span class="event__met">0/05:02 MET</span>
+                  </div>
+                </li>
 
-        <!-- ═══ Lunar Flyby ═══ -->
-        <li class="phase-block timeline-row" data-phase="lunar" data-met-hours="119" data-i18n-meta="phase.lunar.meta">
-          <div class="phase-block__inner" data-animate>
-            <h2 class="phase-block__title" data-i18n="phase.lunar.title">Lunar Flyby</h2>
-            <p class="phase-block__meta">Close approach · max Earth distance</p>
-            <p class="phase-block__desc" data-i18n="phase.lunar.desc">
-              Free-return trajectory milestones including closest approach and record apogee
-              versus Earth for a crewed spacecraft.
-            </p>
-          </div>
-        </li>
+                <!-- HEO -->
+                <li class="event timeline-row timeline-row--phase" data-phase="heo" data-met-hours="14">
+                  <div class="event__inner">
+                    <span class="event__phase-tag" data-i18n="phase.heo.title">High Earth Orbit</span>
+                    <span class="event__met">MET +00/14:00</span>
+                  </div>
+                </li>
 
-        <!-- MET 5/01:23:20 -->
-        <li class="event timeline-row" data-animate data-met-hours="121.39">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">5/01:23:20 MET</span>
-            <h3 class="event__name" data-i18n="event.closeApproach.name">Lunar close approach</h3>
-            <p class="event__detail" data-i18n="event.closeApproach.detail">Closest approach to the lunar surface along the trajectory.</p>
-          </div>
-        </li>
+                <li class="event timeline-row" data-met-hours="25.617">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.tli.name">Trans-Lunar Injection (TLI)</span>
+                    <span class="event__met">01/01:37 MET</span>
+                  </div>
+                </li>
 
-        <!-- MET 5/01:26:57 -->
-        <li class="event timeline-row" data-animate data-met-hours="121.45">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">5/01:26:57 MET</span>
-            <h3 class="event__name" data-i18n="event.maxDistance.name">Max Earth distance</h3>
-            <p class="event__detail" data-i18n="event.maxDistance.detail">Farthest humans from Earth on this mission profile.</p>
-          </div>
-        </li>
+                <li class="event timeline-row" data-met-hours="48.117">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.otc1.name">OTC-1</span>
+                    <span class="event__met">02/00:07 MET</span>
+                  </div>
+                </li>
 
-        <!-- MET 05/07:05 -->
-        <li class="event timeline-row" data-animate data-met-hours="127.083">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">05/07:05 MET</span>
-            <h3 class="event__name" data-i18n="event.satMode.name">SAT mode test</h3>
-            <p class="event__detail" data-i18n="event.satMode.detail">DFTO-EM2-23 — systems demonstration in lunar regime.</p>
-          </div>
-        </li>
+                <!-- Trans-Lunar Coast -->
+                <li class="event timeline-row timeline-row--phase" data-phase="tl" data-met-hours="74">
+                  <div class="event__inner">
+                    <span class="event__phase-tag" data-i18n="phase.tl.title">Trans-Lunar Coast</span>
+                    <span class="event__met">MET +03/02:00</span>
+                  </div>
+                </li>
 
-        <!-- MET 05/12:45 -->
-        <li class="event timeline-row" data-animate data-met-hours="132.75">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">05/12:45 MET</span>
-            <h3 class="event__name" data-i18n="event.cmsmSurvey.name">CM/SM survey</h3>
-            <p class="event__detail" data-i18n="event.cmsmSurvey.detail">External vehicle imagery and systems survey.</p>
-          </div>
-        </li>
+                <li class="event timeline-row" data-met-hours="101.383">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.otc3.name">OTC-3</span>
+                    <span class="event__met">04/05:23 MET</span>
+                  </div>
+                </li>
 
-        <!-- MET 5/19:47 -->
-        <li class="event timeline-row" data-animate data-met-hours="139.78">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">5/19:47 MET</span>
-            <h3 class="event__name" data-i18n="event.soiExit.name">Lunar SOI exit</h3>
-            <p class="event__detail" data-i18n="event.soiExit.detail">Departure from lunar sphere — begin trans-Earth leg.</p>
-          </div>
-        </li>
+                <li class="event timeline-row" data-met-hours="103.983">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.lunarSoi.name">Lunar SOI Entry</span>
+                    <span class="event__met">04/06:59 MET</span>
+                  </div>
+                </li>
 
-        <!-- ═══ Trans-Earth Coast ═══ -->
-        <li class="phase-block timeline-row" data-phase="te" data-met-hours="144" data-i18n-meta="phase.te.meta">
-          <div class="phase-block__inner" data-animate>
-            <h2 class="phase-block__title" data-i18n="phase.te.title">Trans-Earth Coast</h2>
-            <p class="phase-block__meta">RTC · entry prep · cabin repress</p>
-            <p class="phase-block__desc" data-i18n="phase.te.desc">
-              Return coast with checkout milestones, leak checks, and crew preparation for entry
-              and splashdown.
-            </p>
-          </div>
-        </li>
+                <li class="event timeline-row" data-met-hours="117.033">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.apollo13.name">Apollo 13 distance benchmark</span>
+                    <span class="event__met">04/21:02 MET</span>
+                  </div>
+                </li>
 
-        <!-- MET 6/04:23 -->
-        <li class="event timeline-row" data-animate data-met-hours="148.38">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">6/04:23 MET</span>
-            <h3 class="event__name" data-i18n="event.rtc1.name">RTC-1</h3>
-            <p class="event__detail" data-i18n="event.rtc1.detail">Return-to-coast / return checkout sequence (timeline label).</p>
-          </div>
-        </li>
+                <!-- Lunar Flyby -->
+                <li class="event timeline-row timeline-row--phase" data-phase="lunar" data-met-hours="119">
+                  <div class="event__inner">
+                    <span class="event__phase-tag" data-i18n="phase.lunar.title">Lunar Flyby</span>
+                    <span class="event__met">MET +04/23:00</span>
+                  </div>
+                </li>
 
-        <!-- MET 7/17:30 -->
-        <li class="event timeline-row" data-animate data-met-hours="185.5">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">7/17:30 MET</span>
-            <h3 class="event__name" data-i18n="event.fcsCheckouts.name">FCS checkouts</h3>
-            <p class="event__detail" data-i18n="event.fcsCheckouts.detail">Flight control system exercises during Earth approach.</p>
-          </div>
-        </li>
+                <li class="event timeline-row" data-met-hours="121.39">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.closeApproach.name">Lunar close approach</span>
+                    <span class="event__met">05/01:23 MET</span>
+                  </div>
+                </li>
 
-        <!-- MET 8/04:33 -->
-        <li class="event timeline-row" data-animate data-met-hours="196.55">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">8/04:33 MET</span>
-            <h3 class="event__name" data-i18n="event.rtc2.name">RTC-2</h3>
-            <p class="event__detail" data-i18n="event.rtc2.detail">Continued return and entry preparation.</p>
-          </div>
-        </li>
+                <li class="event timeline-row" data-met-hours="121.45">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.maxDistance.name">Max Earth distance — 413,148 km</span>
+                    <span class="event__met">05/01:27 MET</span>
+                  </div>
+                </li>
 
-        <!-- Repress to 14.7 psi -->
-        <li class="event timeline-row" data-animate data-met-hours="205">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">— MET</span>
-            <h3 class="event__name" data-i18n="event.repress.name">Repress to 14.7 psi</h3>
-            <p class="event__detail" data-i18n="event.repress.detail">Cabin at sea-level-equivalent pressure before entry ops.</p>
-          </div>
-        </li>
+                <li class="event timeline-row" data-met-hours="132.75">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.cmsmSurvey.name">CM/SM survey</span>
+                    <span class="event__met">05/12:45 MET</span>
+                  </div>
+                </li>
 
-        <!-- ═══ Entry · Descent · Landing ═══ -->
-        <li class="phase-block timeline-row" data-phase="edl" data-met-hours="211" data-i18n-meta="phase.edl.meta">
-          <div class="phase-block__inner" data-animate>
-            <h2 class="phase-block__title" data-i18n="phase.edl.title">Entry · Descent · Landing</h2>
-            <p class="phase-block__meta">Separation · EI · splashdown</p>
-            <p class="phase-block__desc" data-i18n="phase.edl.desc">
-              Final return milestones through service module separation, entry interface, and
-              Pacific recovery.
-            </p>
-          </div>
-        </li>
+                <li class="event timeline-row" data-met-hours="139.78">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.soiExit.name">Lunar SOI Exit</span>
+                    <span class="event__met">05/19:47 MET</span>
+                  </div>
+                </li>
 
-        <!-- MET 8/20:33 -->
-        <li class="event timeline-row" data-animate data-met-hours="212.55">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">8/20:33 MET</span>
-            <h3 class="event__name" data-i18n="event.rtc3.name">RTC-3</h3>
-            <p class="event__detail" data-i18n="event.rtc3.detail">Final return timeline checkpoint before separation.</p>
-          </div>
-        </li>
+                <!-- Trans-Earth Coast -->
+                <li class="event timeline-row timeline-row--phase" data-phase="te" data-met-hours="144">
+                  <div class="event__inner">
+                    <span class="event__phase-tag" data-i18n="phase.te.title">Trans-Earth Coast</span>
+                    <span class="event__met">MET +06/00:00</span>
+                  </div>
+                </li>
 
-        <!-- MET 09/01:13 -->
-        <li class="event timeline-row" data-animate data-met-hours="217.217">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">09/01:13 MET</span>
-            <h3 class="event__name" data-i18n="event.csmSeparation.name">Command / service module separation</h3>
-            <p class="event__detail" data-i18n="event.csmSeparation.detail">CM oriented for entry; SM released.</p>
-          </div>
-        </li>
+                <li class="event timeline-row" data-met-hours="148.38">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.rtc1.name">RTC-1</span>
+                    <span class="event__met">06/04:23 MET</span>
+                  </div>
+                </li>
 
-        <!-- MET 09/01:33 -->
-        <li class="event timeline-row" data-animate data-met-hours="217.55">
-          <div class="event__marker"></div>
-          <div class="event__card">
-            <span class="event__met">09/01:33 MET</span>
-            <h3 class="event__name" data-i18n="event.entryInterface.name">Entry interface</h3>
-            <p class="event__detail" data-i18n="event.entryInterface.detail">Atmospheric entry begins.</p>
-          </div>
-        </li>
+                <li class="event timeline-row" data-met-hours="185.5">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.fcsCheckouts.name">FCS checkouts</span>
+                    <span class="event__met">07/17:30 MET</span>
+                  </div>
+                </li>
 
-        <!-- MET 09/01:46 — Splashdown -->
-        <li class="event event--finale timeline-row" data-animate data-met-hours="217.767">
-          <div class="event__marker event__marker--pulse"></div>
-          <div class="event__card">
-            <span class="event__met">09/01:46 MET</span>
-            <h3 class="event__name" data-i18n="event.splashdown.name">Splashdown</h3>
-            <p class="event__detail" data-i18n="event.splashdown.detail">End of mission — crew and Orion recovered at sea.</p>
-          </div>
-        </li>
-      </ol>
-    </main>
+                <li class="event timeline-row" data-met-hours="196.55">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.rtc2.name">RTC-2</span>
+                    <span class="event__met">08/04:33 MET</span>
+                  </div>
+                </li>
 
-    <footer class="footer">
-      <p data-animate data-i18n-html="footer">
-        Timeline synthesized from <cite>Artemis&nbsp;II Overview Timeline &mdash; Final</cite> (public
-        release). MET labels follow chart notation (day/hh:mm from liftoff). Launch reference:
-        April&nbsp;1, 2026, 6:35:12&nbsp;p.m.&nbsp;EDT.
-      </p>
-    </footer>
+                <!-- EDL -->
+                <li class="event timeline-row timeline-row--phase" data-phase="edl" data-met-hours="211">
+                  <div class="event__inner">
+                    <span class="event__phase-tag" data-i18n="phase.edl.title">Entry · Descent · Landing</span>
+                    <span class="event__met">MET +08/19:00</span>
+                  </div>
+                </li>
+
+                <li class="event timeline-row" data-met-hours="217.217">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.csmSeparation.name">CM / SM separation</span>
+                    <span class="event__met">09/01:13 MET</span>
+                  </div>
+                </li>
+
+                <li class="event timeline-row" data-met-hours="217.55">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.entryInterface.name">Entry interface</span>
+                    <span class="event__met">09/01:33 MET</span>
+                  </div>
+                </li>
+
+                <li class="event timeline-row event--finale" data-met-hours="217.767">
+                  <div class="event__inner">
+                    <span class="event__name" data-i18n="event.splashdown.name">Splashdown</span>
+                    <span class="event__met">09/01:46 MET</span>
+                  </div>
+                </li>
+
+              </ol><!-- .timeline -->
+            </div><!-- .timeline-scroll -->
+          </section><!-- .timeline-section -->
+
+        </aside><!-- .side-panel -->
+      </div><!-- .main-content -->
+
+      <!-- ─── Status bar ─── -->
+      <footer class="status-bar" role="contentinfo">
+        <div class="status-bar__left">
+          <span class="status-bar__item">
+            <span class="status-bar__lbl">LAUNCH</span>
+            <time class="status-bar__val" datetime="2026-04-01T22:35:12Z">Apr 1, 2026 · 22:35 UTC</time>
+          </span>
+          <span class="status-bar__divider" aria-hidden="true"></span>
+          <span class="status-bar__item">
+            <span class="status-bar__lbl">TRAJECTORY</span>
+            <span class="status-bar__val">NASA/JSC OEM · EME2000</span>
+          </span>
+        </div>
+        <div class="status-bar__right">
+          <span class="status-bar__item">
+            <span class="status-bar__lbl">CREW</span>
+            <span class="status-bar__val">Reid Wiseman · Victor Glover · Christina Koch · Jeremy Hansen</span>
+          </span>
+        </div>
+      </footer>
+
+    </div><!-- .dashboard -->
+
+    <!-- Hidden legacy IDs kept for main.ts compatibility -->
+    <span hidden id="telemetry-met" aria-hidden="true"></span>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -6,6 +6,12 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import gsap from "gsap";
 import { t } from "./i18n.ts";
+import {
+  getTrajectoryPoints,
+  getMoonPosition,
+  OEM_START_MET_H,
+  OEM_END_MET_H,
+} from "./ephemeris.ts";
 
 /* ════════════════════════════════════════════
    Configuration
@@ -19,64 +25,25 @@ import { t } from "./i18n.ts";
  */
 const EARTH_RADIUS = 1;
 const MOON_RADIUS = 0.2727;
-const MOON_POS = new THREE.Vector3(60.33, 0, 0);
+// Moon position derived from real OEM ephemeris data (EME2000 → Three.js transform)
+const MOON_POS: THREE.Vector3 = getMoonPosition();
 const TOTAL_MET_HOURS = 217.7667;
 const SUN_DIR = new THREE.Vector3(1, 0.35, 0.5).normalize();
 
 /*
- * Figure-8 (∞) trajectory — starts at TLI (Earth lobe apex).
- *
- * 24 control points with low tension for a smooth spline.
- * All sampling uses arc-length parametrization (getPointAt) so that
- * the time-based u maps to geometrically correct positions:
- * outbound ≈ 41% of arc, Moon lobe ≈ 18%, return ≈ 41%.
+ * Real trajectory from NASA/JSC OEM ephemeris data.
+ * OEM covers MET +3.37h (post-TLI) through MET +217.3h (pre-splashdown).
+ * Control points are time-uniform EME2000 positions converted to Three.js coords.
  */
-const TLI_MET = 25.617;
-const TRAJ_DURATION = TOTAL_MET_HOURS - TLI_MET;
+const _trajPoints = getTrajectoryPoints(400);
+const curve = new THREE.CatmullRomCurve3(_trajPoints, false, "catmullrom", 0.5);
 
-const PATH_POINTS = [
-  /* 0 — TLI / splashdown: Earth lobe apex */
-  new THREE.Vector3(-2.5, 0, 0),
-
-  /* 1–4 — Upper Earth arc → depart */
-  new THREE.Vector3(-2, 2.5, 0.15),
-  new THREE.Vector3(-0.5, 3.5, 0.25),
-  new THREE.Vector3(1.5, 3.2, 0.2),
-  new THREE.Vector3(4, 2.5, 0.1),
-
-  /* 5–9 — Outbound transit (descending through crossing) */
-  new THREE.Vector3(14, 1.5, 0.05),
-  new THREE.Vector3(24, 0.5, 0),
-  new THREE.Vector3(34, -0.5, 0),
-  new THREE.Vector3(44, -1.5, -0.05),
-  new THREE.Vector3(53, -2.5, -0.1),
-
-  /* 10–14 — Moon lobe */
-  new THREE.Vector3(58, -2, -0.1),
-  new THREE.Vector3(61, -1, -0.05),
-  new THREE.Vector3(62.8, 0, 0),
-  new THREE.Vector3(61, 1, 0.05),
-  new THREE.Vector3(58, 2, 0.1),
-
-  /* 15–19 — Return transit (descending through crossing) */
-  new THREE.Vector3(53, 2.5, 0.1),
-  new THREE.Vector3(44, 1.5, 0.05),
-  new THREE.Vector3(34, 0.5, 0),
-  new THREE.Vector3(24, -0.5, 0),
-  new THREE.Vector3(14, -1.5, -0.05),
-
-  /* 20–23 — Lower Earth arc (wraps back to 0) */
-  new THREE.Vector3(4, -2.5, -0.1),
-  new THREE.Vector3(1.5, -3.2, -0.2),
-  new THREE.Vector3(-0.5, -3.5, -0.25),
-  new THREE.Vector3(-2, -2.5, -0.15),
-];
-
-const curve = new THREE.CatmullRomCurve3(PATH_POINTS, true, "catmullrom", 0.15);
-
-/** Map mission MET-hours to curve parameter u (0 at TLI, 1 at splashdown). */
+/**
+ * Map mission MET-hours to curve t parameter.
+ * t=0 → OEM start (~MET 3.37h), t=1 → OEM end (~MET 217.3h).
+ */
 function metToU(metHours: number): number {
-  return Math.min(1, Math.max(0, (metHours - TLI_MET) / TRAJ_DURATION));
+  return Math.min(1, Math.max(0, (metHours - OEM_START_MET_H) / (OEM_END_MET_H - OEM_START_MET_H)));
 }
 
 interface Milestone {
@@ -96,7 +63,7 @@ const MILESTONES: Milestone[] = [
 ];
 
 export function sampleCraftPosition(u: number): THREE.Vector3 {
-  return curve.getPointAt(Math.min(1, Math.max(0, u)));
+  return curve.getPoint(Math.min(1, Math.max(0, u)));
 }
 
 /* ════════════════════════════════════════════
@@ -160,11 +127,15 @@ uniform float progress;
 varying float vU;
 void main() {
   float t = 1.0 - smoothstep(progress - 0.012, progress + 0.012, vU);
-  vec3 bright = vec3(0.243, 0.878, 1.0);
-  vec3 dim = vec3(0.04, 0.1, 0.18);
+  vec3 bright = vec3(1.0, 0.95, 0.90);
+  vec3 dim = vec3(0.10, 0.07, 0.05);
+  vec3 orange = vec3(0.988, 0.239, 0.129);
   vec3 color = mix(dim, bright, t);
-  float alpha = mix(0.12, 0.6, t);
-  float pulse = 0.85 + 0.15 * sin(vU * 120.0 + progress * 40.0);
+  // Leading-edge orange tint
+  float lead = smoothstep(progress - 0.025, progress, vU) * (1.0 - smoothstep(progress, progress + 0.005, vU));
+  color = mix(color, orange, lead * 2.5 * t);
+  float alpha = mix(0.08, 0.55, t);
+  float pulse = 0.88 + 0.12 * sin(vU * 120.0 + progress * 40.0);
   alpha *= mix(1.0, pulse, t);
   gl_FragColor = vec4(color, alpha);
 }`;
@@ -229,7 +200,7 @@ function buildOrion(): OrionCraft {
 
   const engineGlow = new THREE.Mesh(
     new THREE.SphereGeometry(0.15, 12, 12),
-    new THREE.MeshBasicMaterial({ color: 0x3ee0ff, transparent: true, opacity: 0.85 })
+    new THREE.MeshBasicMaterial({ color: 0xFC3D21, transparent: true, opacity: 0.85 })
   );
   engineGlow.position.z = -0.73;
   group.add(engineGlow);
@@ -261,7 +232,7 @@ function createTrailSystem(scene: THREE.Scene): TrailSystem {
 
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      color: { value: new THREE.Color(0x3ee0ff) },
+      color: { value: new THREE.Color(0xff8844) },
       pixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
     },
     vertexShader: `
@@ -406,10 +377,11 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
   renderer.toneMappingExposure = 1.1;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x020408);
+  scene.background = new THREE.Color(0x000000);
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 3000);
-  camera.position.set(30, 12, 65);
+  // Frame the trajectory: Earth (0,0,0) → Moon area (~-19, -28, 50)
+  camera.position.set(20, 35, 90);
 
   /* ——— Post-processing: Bloom ——— */
   const composer = new EffectComposer(renderer);
@@ -417,9 +389,9 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
 
   const bloomPass = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    0.6,   // strength
-    0.4,   // radius
-    0.85   // threshold
+    0.45,  // strength
+    0.35,  // radius
+    0.92   // threshold
   );
   composer.addPass(bloomPass);
   composer.addPass(new OutputPass());
@@ -428,7 +400,7 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
   controls.dampingFactor = 0.06;
-  controls.target.set(30, 0, 0);
+  controls.target.set(-10, -12, 25);
   controls.minDistance = 3;
   controls.maxDistance = 300;
   controls.autoRotate = true;
@@ -573,8 +545,8 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
     return mesh;
   };
 
-  makeAtm(EARTH_RADIUS * 1.04, 0x4ad4ff, 1.6, 4.5, THREE.FrontSide);
-  makeAtm(EARTH_RADIUS * 1.12, 0x3399dd, 0.5, 2.5, THREE.BackSide);
+  makeAtm(EARTH_RADIUS * 1.04, 0x88ccff, 1.4, 5.0, THREE.FrontSide);
+  makeAtm(EARTH_RADIUS * 1.12, 0x4488bb, 0.4, 2.5, THREE.BackSide);
 
 
   /* ════════════════════════════════════════════
@@ -604,7 +576,7 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
 
   const TUBE_SEG = 800;
   const TUBE_RAD = 12;
-  const tubeGeo = new THREE.TubeGeometry(curve, TUBE_SEG, 0.05, TUBE_RAD, true);
+  const tubeGeo = new THREE.TubeGeometry(curve, TUBE_SEG, 0.05, TUBE_RAD, false);
 
   const posCount = tubeGeo.attributes.position.count;
   const rings = TUBE_SEG + 1;
@@ -639,7 +611,7 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
 
   const posMarker = new THREE.Mesh(
     new THREE.SphereGeometry(0.2, 16, 16),
-    new THREE.MeshBasicMaterial({ color: 0xff6b4a, transparent: true, opacity: 0.45 })
+    new THREE.MeshBasicMaterial({ color: 0xFC3D21, transparent: true, opacity: 0.35 })
   );
   scene.add(posMarker);
 
@@ -666,7 +638,7 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
 
   for (const ms of MILESTONES) {
     const u = metToU(ms.metHours);
-    const pos = curve.getPointAt(u);
+    const pos = curve.getPoint(u);
 
     const dot = new THREE.Mesh(
       new THREE.SphereGeometry(0.22, 14, 14),
@@ -695,7 +667,7 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
   /* Body labels */
   const bodyLabels: Label[] = [];
   for (const { key, worldPos, color } of [
-    { key: "body.earth", worldPos: new THREE.Vector3(0, EARTH_RADIUS + 0.5, 0), color: "#4ad4ff" },
+    { key: "body.earth", worldPos: new THREE.Vector3(0, EARTH_RADIUS + 0.5, 0), color: "#88ccff" },
     { key: "body.moon", worldPos: MOON_POS.clone().add(new THREE.Vector3(0, MOON_RADIUS + 0.4, 0)), color: "#c8cdd0" },
   ]) {
     const el = document.createElement("div");
@@ -802,15 +774,17 @@ export function createOrbitScene(canvas: HTMLCanvasElement, clock: OrbitClock): 
   function animate() {
     raf = requestAnimationFrame(animate);
     const rawProgress = clock.getProgress();
-    const u = metToU(rawProgress * TOTAL_MET_HOURS);
+    const metHours = rawProgress * TOTAL_MET_HOURS;
+    const u = metToU(metHours);
     const now = performance.now();
     frameCount++;
 
-    /* Spacecraft */
-    const pos = curve.getPointAt(u);
-    const tc = Math.min(0.999, Math.max(0.001, u));
-    const tangent = curve.getTangentAt(tc);
-    if (tangent.lengthSq() < 1e-10) tangent.set(1, 0, 0);
+    /* Spacecraft — position from curve so it stays exactly on the tube */
+    const pos = curve.getPoint(Math.max(0, Math.min(1, u)));
+    // Tangent from curve (stays aligned with the tube geometry)
+    const tc = Math.max(0.001, Math.min(0.999, u));
+    const tangent = curve.getTangent(tc);
+    if (tangent.lengthSq() < 1e-10) tangent.set(0, 0, 1);
     else tangent.normalize();
 
     craft.position.copy(pos);
