@@ -59,6 +59,42 @@ const sortedRows: Array<{ el: HTMLElement; h: number }> = timelineRows
 const TOTAL_MET_HOURS = (SPLASH.getTime() - LAUNCH.getTime()) / 3600000;
 
 /* ══════════════════════════════════════════════
+   Resizable side panel
+   ══════════════════════════════════════════════ */
+{
+  const gutter = document.getElementById("resize-gutter");
+  const root = document.documentElement;
+
+  if (gutter) {
+    let dragging = false;
+
+    gutter.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      dragging = true;
+      gutter.classList.add("resize-gutter--active");
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      const sideW = window.innerWidth - e.clientX - 4;
+      const clamped = Math.max(200, Math.min(sideW, window.innerWidth * 0.6));
+      root.style.setProperty("--side-w", `${clamped}px`);
+      orbitApi?.resize();
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (!dragging) return;
+      dragging = false;
+      gutter.classList.remove("resize-gutter--active");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    });
+  }
+}
+
+/* ══════════════════════════════════════════════
    Phase name lookup
    ══════════════════════════════════════════════ */
 function getPhaseName(metHours: number): string {
@@ -119,6 +155,14 @@ if (distCanvas) {
    Main update loop
    ══════════════════════════════════════════════ */
 const scrollEl = document.querySelector(".timeline-scroll");
+let userScrolledAt = 0;
+const SCROLL_PAUSE_MS = 15_000;
+
+if (scrollEl) {
+  scrollEl.addEventListener("wheel", () => { userScrolledAt = Date.now(); }, { passive: true });
+  scrollEl.addEventListener("touchmove", () => { userScrolledAt = Date.now(); }, { passive: true });
+  scrollEl.addEventListener("pointerdown", () => { userScrolledAt = Date.now(); });
+}
 
 function updateDashboard() {
   const state = getMissionState();
@@ -204,8 +248,7 @@ function updateDashboard() {
       else if (row === currentEl) row.classList.add("timeline-row--current");
       else                   row.classList.add("timeline-row--future");
     }
-    // Scroll current row into view (gently)
-    if (currentEl) {
+    if (currentEl && Date.now() - userScrolledAt > SCROLL_PAUSE_MS) {
       const rect = currentEl.getBoundingClientRect();
       const container = scrollEl?.getBoundingClientRect();
       if (container && (rect.top < container.top || rect.bottom > container.bottom)) {

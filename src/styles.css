@@ -162,10 +162,21 @@ html, body {
 /* ─── Main content ───────────────────────────────────────── */
 .main-content {
   display: grid;
-  grid-template-columns: 1fr var(--side-w);
+  grid-template-columns: 1fr 4px var(--side-w);
   overflow: hidden;
   min-height: 0;
 }
+
+/* ─── Resize gutter ─────────────────────────────────────── */
+.resize-gutter {
+  width: 4px;
+  cursor: col-resize;
+  background: var(--border);
+  transition: background 0.15s;
+  z-index: 12;
+}
+.resize-gutter:hover,
+.resize-gutter--active { background: var(--accent); }
 
 /* ─── Orbit panel ────────────────────────────────────────── */
 .orbit-panel {
@@ -456,7 +467,7 @@ html, body {
 .event__inner { display: flex; flex-direction: column; gap: 1px; }
 
 .event__name {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--text-2);
   white-space: nowrap;
@@ -466,7 +477,7 @@ html, body {
 }
 .event__met {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-3);
   letter-spacing: 0.03em;
   transition: color 0.15s;
@@ -484,7 +495,7 @@ html, body {
 
 .event__phase-tag {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -610,6 +621,7 @@ html, body {
     grid-template-columns: 1fr;
     grid-template-rows: 45vh 1fr;
   }
+  .resize-gutter { display: none; }
   .side-panel { border-left: none; border-top: 1px solid var(--border); }
   .status-bar__right { display: none; }
   .topbar__program { display: none; }
