@@ -382,6 +382,11 @@ export function createOrbitScene(
     autoRotateTimer = setTimeout(() => { controls.autoRotate = true; }, 8000);
   });
 
+  /* ——— Follow state — which object the camera orbits ——— */
+  type FollowTarget = 'craft' | 'earth' | 'moon' | 'milestone';
+  let followTarget: FollowTarget = 'craft';
+  let followingActive = false; // activated after initial fly-in animation
+
   /* ——— Lighting ——— */
   scene.add(new THREE.AmbientLight(0x223344, 0.35));
 
@@ -770,38 +775,70 @@ export function createOrbitScene(
 
   canvas.addEventListener("pointerleave", () => { tooltip.style.display = "none"; });
 
-  /* Click milestone → fly camera to it */
+  /* Click on milestone, Earth, Moon or spacecraft → fly camera to orbit it */
   canvas.addEventListener("click", (e) => {
     const rect = canvas.getBoundingClientRect();
     mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
     raycaster.setFromCamera(mouse, camera);
-    const hits = raycaster.intersectObjects(milestoneMeshes.map((m) => m.dot));
 
-    if (hits.length > 0) {
-      const ms = milestoneMeshes.find((m) => m.dot === hits[0].object);
-      if (ms) flyTo(ms.pos);
+    // Priority 1: milestone dots
+    const milestoneHits = raycaster.intersectObjects(milestoneMeshes.map((m) => m.dot));
+    if (milestoneHits.length > 0) {
+      const ms = milestoneMeshes.find((m) => m.dot === milestoneHits[0].object);
+      if (ms) focusOn('milestone', ms.pos, 8);
+      return;
+    }
+
+    // Priority 2: spacecraft marker, Earth, Moon
+    const bodyHits = raycaster.intersectObjects([posMarker, earth, moon]);
+    if (bodyHits.length > 0) {
+      const obj = bodyHits[0].object;
+      if (obj === posMarker) {
+        focusOn('craft', posMarker.position.clone(), 4);
+      } else if (obj === earth) {
+        focusOn('earth', new THREE.Vector3(0, 0, 0), 4);
+      } else if (obj === moon) {
+        focusOn('moon', MOON_POS.clone(), 1.0);
+      }
     }
   });
 
-  function flyTo(target: THREE.Vector3): void {
+  function focusOn(type: FollowTarget, worldPos: THREE.Vector3, orbitDist: number): void {
+    followTarget = type;
+    followingActive = false;
     controls.autoRotate = false;
     clearTimeout(autoRotateTimer);
 
-    const offset = new THREE.Vector3().subVectors(camera.position, controls.target).normalize().multiplyScalar(8);
+    const offset = new THREE.Vector3()
+      .subVectors(camera.position, controls.target)
+      .normalize()
+      .multiplyScalar(orbitDist);
+    if (offset.lengthSq() < 0.01) offset.set(0, 0.4, 1).normalize().multiplyScalar(orbitDist);
+
+    gsap.killTweensOf(controls.target);
+    gsap.killTweensOf(camera.position);
 
     gsap.to(controls.target, {
-      x: target.x, y: target.y, z: target.z,
+      x: worldPos.x, y: worldPos.y, z: worldPos.z,
       duration: 2.0, ease: "power3.inOut",
     });
     gsap.to(camera.position, {
-      x: target.x + offset.x, y: target.y + offset.y + 2, z: target.z + offset.z,
+      x: worldPos.x + offset.x,
+      y: worldPos.y + offset.y + (type === 'milestone' ? 2 : 0),
+      z: worldPos.z + offset.z,
       duration: 2.0, ease: "power3.inOut",
       onComplete: () => {
-        autoRotateTimer = setTimeout(() => { controls.autoRotate = true; }, 8000);
+        followingActive = true;
+        controls.autoRotate = true;
       },
     });
+  }
+
+  /* Keep flyTo for external API backwards-compat */
+  function flyTo(target: THREE.Vector3): void {
+    focusOn('milestone', target, 8);
   }
 
   /* Controls hint */
@@ -870,6 +907,22 @@ export function createOrbitScene(
     clouds.rotation.y += rot * 1.6;
     moon.rotation.y += 0.0003;
 
+    /* Follow active target — keep OrbitControls centred on it */
+    if (followingActive) {
+      if (followTarget === 'craft') {
+        controls.target.copy(pos);
+      }
+      // earth / moon / milestone: controls.target was set by GSAP and stays put
+    }
+
+    /* Distance-based milestone marker scaling — shrink when camera is close */
+    for (const { dot, ring, pos: mpos } of milestoneMeshes) {
+      const dist = camera.position.distanceTo(mpos);
+      const scale = THREE.MathUtils.clamp(dist / 5, 0.12, 1.0);
+      dot.scale.setScalar(scale);
+      ring.scale.setScalar(scale);
+    }
+
     /* Milestone rings face camera */
     for (const { ring } of milestoneMeshes) ring.lookAt(camera.position);
 
@@ -916,6 +969,25 @@ export function createOrbitScene(
 
   resize();
   animate();
+
+  /* Default: orbit spacecraft — fly in once loading is complete */
+  const _doInitialFocus = (): void => {
+    const rawProgress = clock.getProgress();
+    const metHoursNow = rawProgress * TOTAL_MET_HOURS;
+    const uNow = metToU(metHoursNow);
+    const initCraftPos = curve.getPoint(Math.max(0, Math.min(1, uNow)));
+    focusOn('craft', initCraftPos, 10);
+  };
+  if (loadCallbacks) {
+    // Wrap the onReady callback so we can delay slightly for the loading screen fade
+    const _wrappedReady = loadCallbacks.onReady;
+    loadCallbacks.onReady = () => {
+      _wrappedReady?.();
+      setTimeout(_doInitialFocus, 800);
+    };
+  } else {
+    setTimeout(_doInitialFocus, 1500);
+  }
 
   function updateLabels() {
     for (const lb of milestoneLabels) lb.el.textContent = t(lb.key);
