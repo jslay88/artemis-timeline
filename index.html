@@ -49,22 +49,33 @@
         <!-- 3D orbit view -->
         <div class="orbit-panel" id="orbit-wrap" aria-label="3D spacecraft trajectory">
           <canvas id="orbit-canvas"></canvas>
-          <button
-            type="button"
-            class="orbit-fullscreen-btn"
-            id="orbit-fullscreen"
-            data-i18n-title="orbit.fullscreenTip"
-            title="Toggle fullscreen"
-            data-i18n-label="orbit.fullscreenTip"
-            aria-label="Toggle fullscreen"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"
-                stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
-              />
-            </svg>
-          </button>
+          <!-- Camera controls toolbar -->
+          <div class="orbit-controls-toolbar">
+            <button type="button" class="orbit-ctrl-btn" id="orbit-craft-focus" title="Focus on spacecraft" aria-label="Focus on spacecraft">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
+              </svg>
+            </button>
+            <button type="button" class="orbit-ctrl-btn" id="orbit-reset" title="Reset camera view" aria-label="Reset camera view">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M3 3v5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button type="button" class="orbit-ctrl-btn orbit-ctrl-btn--toggle" id="orbit-autorotate" title="Toggle auto-rotate" aria-label="Toggle auto-rotate" data-active="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-9-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M21 3v6h-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button type="button" class="orbit-ctrl-btn" id="orbit-fullscreen" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
           <!-- Phase overlay on orbit view -->
           <div class="orbit-phase-overlay" id="orbit-phase-overlay" aria-hidden="true">
             <span class="orbit-phase-label" id="orbit-phase-label">—</span>

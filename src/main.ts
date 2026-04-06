@@ -411,6 +411,18 @@ if (orbitCanvas) {
     }, loadCb);
     window.addEventListener("resize", () => orbitApi?.resize());
     fullscreenBtn?.addEventListener("click", () => orbitApi?.toggleFullscreen());
+
+    // Kapsel-Fokus Button
+    document.getElementById("orbit-craft-focus")?.addEventListener("click", () => orbitApi?.focusCraft());
+
+    // Timeline-Klick → 3D fokussiert den Missionspunkt
+    document.querySelectorAll<HTMLElement>(".timeline-row[data-met-hours]").forEach((row) => {
+      row.style.cursor = "pointer";
+      row.addEventListener("click", () => {
+        const met = parseFloat(row.dataset.metHours ?? "0");
+        orbitApi?.flyToMET(met);
+      });
+    });
   } catch (e) {
     console.warn("Orbit 3D unavailable:", e);
     (orbitCanvas.closest(".orbit-panel") as HTMLElement)?.style.setProperty("background", "#0b0b0b");

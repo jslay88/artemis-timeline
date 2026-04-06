@@ -204,12 +204,18 @@ html, body {
   height: 100% !important;
 }
 
-.orbit-fullscreen-btn {
+.orbit-controls-toolbar {
   position: absolute;
   top: 10px;
   right: 10px;
-  width: 30px;
-  height: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 5;
+}
+.orbit-ctrl-btn {
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -217,10 +223,14 @@ html, body {
   border: 1px solid var(--border);
   color: var(--text-2);
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-  z-index: 5;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
-.orbit-fullscreen-btn:hover { border-color: var(--border-hi); color: var(--text); }
+.orbit-ctrl-btn:hover { border-color: var(--border-hi); color: var(--text); }
+.orbit-ctrl-btn--toggle[data-active="false"] {
+  color: var(--text-4);
+  border-color: transparent;
+  background: rgba(0,0,0,0.35);
+}
 
 .orbit-phase-overlay {
   position: absolute;
