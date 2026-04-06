@@ -10,7 +10,7 @@ import {
 import { createOrbitScene, type OrbitLoadCallbacks } from "./orbit-scene.ts";
 import { initI18n, t, setLocale, getLocale, getLocales, onLocaleChange } from "./i18n.ts";
 import { getTelemetry } from "./ephemeris.ts";
-import { createSpeedChart, createDistanceChart, type MissionChart } from "./telemetry-charts.ts";
+import { createSpeedChart, createDistanceChart, createAltitudeChart, type MissionChart } from "./telemetry-charts.ts";
 
 /* ══════════════════════════════════════════════
    i18n bootstrap + locale picker
@@ -202,15 +202,20 @@ function computeNowPx(state: MissionState): number {
    ══════════════════════════════════════════════ */
 let speedChart: MissionChart | null = null;
 let distChart:  MissionChart | null = null;
+let altChart:   MissionChart | null = null;
 
 const speedCanvas = document.getElementById("chart-speed") as HTMLCanvasElement | null;
 const distCanvas  = document.getElementById("chart-distance") as HTMLCanvasElement | null;
+const altCanvas   = document.getElementById("chart-altitude") as HTMLCanvasElement | null;
 
 if (speedCanvas) {
   try { speedChart = createSpeedChart(speedCanvas); } catch (e) { console.warn("Speed chart:", e); }
 }
 if (distCanvas) {
   try { distChart = createDistanceChart(distCanvas); } catch (e) { console.warn("Distance chart:", e); }
+}
+if (altCanvas) {
+  try { altChart = createAltitudeChart(altCanvas); } catch (e) { console.warn("Altitude chart:", e); }
 }
 
 /* ══════════════════════════════════════════════
@@ -299,6 +304,7 @@ function updateDashboard() {
   // ── Chart needles ──
   speedChart?.setNeedle(metHours);
   distChart?.setNeedle(metHours);
+  altChart?.setNeedle(metHours);
 
   // ── Timeline marker (only write DOM when the value actually changes) ──
   syncTrackHeight();

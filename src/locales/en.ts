@@ -110,6 +110,7 @@ const en: LocaleStrings = {
   "sidebar.altitude": "Altitude",
   "sidebar.velocity": "Velocity",
   "sidebar.distChart": "Distance from Earth",
+  "sidebar.altChart": "Altitude",
   "sidebar.timeline": "Mission Timeline",
   "footer.launch": "LAUNCH",
   "footer.trajectory": "TRAJECTORY",

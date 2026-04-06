@@ -86,32 +86,24 @@ function transLunarCoast(metHours: number): { r: number; v: number } {
   return { r, v };
 }
 
-function lunarSOI(metHours: number): { r: number; v: number } {
-  // Interpolate r linearly from SOI entry to pericynthion to SOI exit
-  // For speed: use Moon-centered hyperbola via vis-viva in Moon SOI
+function lunarSOI(metHours: number): { r: number; v: number; rMoon: number } {
   const tTotal = T_SOI_EXIT - T_SOI_ENTRY;
   const tHalf  = T_PERICYNTHION - T_SOI_ENTRY;
   const t      = metHours - T_SOI_ENTRY;
 
-  let r_moon: number; // distance from Moon center
+  let r_moon: number;
   if (t <= tHalf) {
-    // Approaching pericynthion
     const frac = t / tHalf;
     r_moon = SOI_MOON + (R_MOON + 110 - SOI_MOON) * (frac * frac * (3 - 2 * frac));
   } else {
-    // Receding from pericynthion
     const frac = (t - tHalf) / (tTotal - tHalf);
     r_moon = (R_MOON + 110) + (SOI_MOON - R_MOON - 110) * (frac * frac * (3 - 2 * frac));
   }
 
-  // Speed in Moon's reference frame via vis-viva on hyperbola: v² = C3 + 2μ/r
   const v_moon_frame = Math.sqrt(C3_MOON + 2 * MU_MOON / r_moon);
-  // Distance from Earth: r ≈ D_MOON - r_moon (on approach) or +(on departure)
-  const r_earth = t < tHalf
-    ? D_MOON - r_moon
-    : D_MOON - r_moon;
+  const r_earth = D_MOON - r_moon;
 
-  return { r: Math.max(r_earth, R_EARTH + 50), v: v_moon_frame };
+  return { r: Math.max(r_earth, R_EARTH + 50), v: v_moon_frame, rMoon: r_moon };
 }
 
 function transEarthCoast(metHours: number): { r: number; v: number } {
@@ -157,6 +149,8 @@ function blendStates(
 export interface OrbitalState {
   distanceFromEarth: number;  // km from Earth center
   altitudeAboveEarth: number; // km above surface
+  altitudeAboveMoon: number;  // km above Moon surface (NaN if not in lunar SOI)
+  soiBody: "earth" | "moon";
   speed: number;              // km/s
   phase: string;
 }
@@ -216,9 +210,16 @@ export function sampleOrionTelemetry(metHours: number): OrbitalState {
   }
 
   const altitude = Math.max(state.r - R_EARTH, 0);
+  const inMoonSOI = metHours >= T_SOI_ENTRY && metHours <= T_SOI_EXIT;
+  const altMoon = inMoonSOI && "rMoon" in state
+    ? Math.max((state as { rMoon: number }).rMoon - R_MOON, 0)
+    : NaN;
+
   return {
     distanceFromEarth:  state.r,
     altitudeAboveEarth: altitude,
+    altitudeAboveMoon:  altMoon,
+    soiBody:            inMoonSOI ? "moon" : "earth",
     speed:              state.v,
     phase,
   };
@@ -231,6 +232,8 @@ export interface TelemetryTable {
   speed:     Float64Array;
   distance:  Float64Array;
   altitude:  Float64Array;
+  altEarth:  Float64Array; // altitude above Earth (NaN during Moon SOI)
+  altMoon:   Float64Array; // altitude above Moon (NaN outside Moon SOI)
   count:     number;
 }
 
@@ -239,6 +242,8 @@ export function buildTelemetryTable(sampleCount = 1000): TelemetryTable {
   const speed    = new Float64Array(sampleCount);
   const distance = new Float64Array(sampleCount);
   const altitude = new Float64Array(sampleCount);
+  const altEarth = new Float64Array(sampleCount);
+  const altMoon  = new Float64Array(sampleCount);
 
   for (let i = 0; i < sampleCount; i++) {
     const t = (i / (sampleCount - 1)) * T_SPLASHDOWN;
@@ -247,7 +252,15 @@ export function buildTelemetryTable(sampleCount = 1000): TelemetryTable {
     speed[i]    = s.speed;
     distance[i] = s.distanceFromEarth;
     altitude[i] = s.altitudeAboveEarth;
+
+    if (s.soiBody === "moon") {
+      altEarth[i] = NaN;
+      altMoon[i]  = s.altitudeAboveMoon;
+    } else {
+      altEarth[i] = s.altitudeAboveEarth;
+      altMoon[i]  = NaN;
+    }
   }
 
-  return { metHours, speed, distance, altitude, count: sampleCount };
+  return { metHours, speed, distance, altitude, altEarth, altMoon, count: sampleCount };
 }
