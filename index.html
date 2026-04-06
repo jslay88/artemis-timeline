@@ -14,9 +14,9 @@
   <body>
     <!-- ═══ Loading screen (inline styles for instant render before CSS) ═══ -->
     <div id="loading-screen" style="position:fixed;inset:0;z-index:9999;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Inter',system-ui,sans-serif;">
-      <div style="text-align:center;">
-        <div style="font-size:11px;letter-spacing:6px;color:#a0a0a0;margin-bottom:6px;text-transform:uppercase;">NASA</div>
-        <div style="font-size:28px;font-weight:600;letter-spacing:4px;color:#fff;margin-bottom:32px;">ARTEMIS II</div>
+      <div style="text-align:center;display:flex;flex-direction:column;align-items:center;">
+        <img src="images/nasa-logo.svg" alt="NASA" style="height:140px;margin-bottom:16px;" />
+        <img src="images/artemis2-patch.png" alt="Artemis II Mission Patch" style="height:480px;margin-bottom:24px;" />
         <div style="width:240px;height:2px;background:rgba(255,255,255,0.08);border-radius:1px;overflow:hidden;">
           <div id="loading-bar" style="width:0%;height:100%;background:#FC3D21;border-radius:1px;transition:width 0.3s ease-out;"></div>
         </div>
@@ -30,7 +30,7 @@
       <!-- ─── Top bar ─── -->
       <header class="topbar" role="banner">
         <div class="topbar__left">
-          <span class="topbar__program">NASA · ARTEMIS II</span>
+          <span class="topbar__program"><img src="images/nasa-worm.svg" alt="NASA" style="height:1.4em;vertical-align:middle;margin-right:2px;" /> · ARTEMIS II</span>
           <span class="topbar__sep" aria-hidden="true">|</span>
           <span class="topbar__status" id="mission-hud-phase">—</span>
         </div>
@@ -109,9 +109,9 @@
                 <span class="telem-item__unit">km</span>
               </div>
               <div class="telem-item">
-                <span class="telem-item__label" data-i18n="sidebar.altitude">Altitude</span>
+                <span class="telem-item__label" id="tel-altitude-label" data-i18n="sidebar.altitude">Altitude</span>
                 <span class="telem-item__value" id="tel-altitude">—</span>
-                <span class="telem-item__unit">km</span>
+                <span class="telem-item__unit">km <span id="tel-altitude-body"></span></span>
               </div>
               <div class="telem-item telem-item--wide">
                 <span class="telem-item__label" id="mission-hud-sub-label">T+LAUNCH</span>

@@ -6,16 +6,85 @@ import * as THREE from "three";
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 export const R_EARTH = 6371;      // km — 1 scene unit
+export const R_MOON  = 1737.4;   // km
 const SCALE = 1 / R_EARTH;
 const LAUNCH_MS = new Date("2026-04-01T22:35:12Z").getTime();
 
-// Moon EME2000/ICRF position from JPL DE441 ephemeris (via Horizons API) at
-// closest approach time 2026-04-06T23:05:51 UTC (MET +120.511 h).
-// Actual Earth-Moon distance at this epoch: ~404,740 km (Moon near apogee).
-// Validated: min OEM trajectory-to-Moon distance = 8,428 km (6,691 km above surface).
-const MOON_EME_X = -129031;
-const MOON_EME_Y = -335933;
-const MOON_EME_Z = -185241;
+const LUNAR_SOI_ENTRY_MET_H = 102.111;
+const LUNAR_SOI_EXIT_MET_H  = 138.911;
+
+// Moon EME2000/ICRF positions from JPL DE441 ephemeris (Horizons API),
+// every 6 hours for the full mission. Linearly interpolated at runtime.
+// [utcMs offset from LAUNCH, x_km, y_km, z_km]
+const MOON_LUT: [number, number, number, number][] = [
+  [5088000, -385834, -60039, -46891],       // MET 1.4h
+  [26688000, -381940, -78885, -56873],      // MET 7.4h
+  [48288000, -376886, -97492, -66680],      // MET 13.4h
+  [69888000, -370694, -115803, -76285],     // MET 19.4h
+  [91488000, -363392, -133765, -85659],     // MET 25.4h
+  [113088000, -355008, -151325, -94774],    // MET 31.4h
+  [134688000, -345572, -168434, -103606],   // MET 37.4h
+  [156288000, -335121, -185041, -112129],   // MET 43.4h
+  [177888000, -323690, -201101, -120319],   // MET 49.4h
+  [199488000, -311318, -216569, -128154],   // MET 55.4h
+  [221088000, -298046, -231401, -135612],   // MET 61.4h
+  [242688000, -283917, -245559, -142674],   // MET 67.4h
+  [264288000, -268977, -259002, -149321],   // MET 73.4h
+  [285888000, -253271, -271696, -155535],   // MET 79.4h
+  [307488000, -236847, -283606, -161299],   // MET 85.4h
+  [329088000, -219756, -294700, -166599],   // MET 91.4h
+  [350688000, -202048, -304949, -171421],   // MET 97.4h
+  [372288000, -183774, -314327, -175752],   // MET 103.4h
+  [393888000, -164989, -322807, -179581],   // MET 109.4h
+  [415488000, -145745, -330367, -182898],   // MET 115.4h
+  [437088000, -126098, -336987, -185693],   // MET 121.4h
+  [458688000, -106103, -342649, -187961],   // MET 127.4h
+  [480288000, -85817, -347337, -189694],    // MET 133.4h
+  [501888000, -65297, -351037, -190886],    // MET 139.4h
+  [523488000, -44600, -353737, -191536],    // MET 145.4h
+  [545088000, -23784, -355430, -191639],    // MET 151.4h
+  [566688000, -2908, -356107, -191194],     // MET 157.4h
+  [588288000, 17970, -355765, -190202],     // MET 163.4h
+  [609888000, 38790, -354402, -188663],     // MET 169.4h
+  [631488000, 59493, -352016, -186581],     // MET 175.4h
+  [653088000, 80020, -348612, -183959],     // MET 181.4h
+  [674688000, 100311, -344194, -180801],    // MET 187.4h
+  [696288000, 120307, -338770, -177114],    // MET 193.4h
+  [717888000, 139947, -332349, -172907],    // MET 199.4h
+  [739488000, 159174, -324944, -168187],    // MET 205.4h
+  [761088000, 177927, -316569, -162966],    // MET 211.4h
+  [782688000, 196148, -307244, -157256],    // MET 217.4h
+];
+
+function getMoonEME2000At(utcMs: number): { x: number; y: number; z: number } {
+  const offset = utcMs - LAUNCH_MS;
+
+  if (offset <= MOON_LUT[0][0])
+    return { x: MOON_LUT[0][1], y: MOON_LUT[0][2], z: MOON_LUT[0][3] };
+
+  const last = MOON_LUT[MOON_LUT.length - 1];
+  if (offset >= last[0])
+    return { x: last[1], y: last[2], z: last[3] };
+
+  let lo = 0, hi = MOON_LUT.length - 2;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (MOON_LUT[mid][0] <= offset) lo = mid; else hi = mid - 1;
+  }
+
+  const a = MOON_LUT[lo];
+  const b = MOON_LUT[lo + 1];
+  const t = (offset - a[0]) / (b[0] - a[0]);
+
+  return {
+    x: a[1] + t * (b[1] - a[1]),
+    y: a[2] + t * (b[2] - a[2]),
+    z: a[3] + t * (b[3] - a[3]),
+  };
+}
+
+// Closest-approach Moon position for 3D scene rendering (MET ~120.5h)
+const MOON_SCENE_EME = getMoonEME2000At(LAUNCH_MS + 120.511 * 3600000);
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 export interface StateVector {
@@ -31,7 +100,8 @@ export interface StateVector {
 export interface TelemetrySample {
   speed: number;               // km/s (magnitude of velocity)
   distanceFromEarth: number;   // km (from Earth center)
-  altitudeAboveEarth: number;  // km (above surface)
+  altitude: number;            // km (above surface of SOI body)
+  altitudeBody: "earth" | "moon";
 }
 
 // ─── OEM Parser ────────────────────────────────────────────────────────────
@@ -106,11 +176,27 @@ export function getTelemetry(utcMs: number): TelemetrySample {
   const sv = interpolateState(utcMs);
   const r = Math.sqrt(sv.x * sv.x + sv.y * sv.y + sv.z * sv.z);
   const speed = Math.sqrt(sv.vx * sv.vx + sv.vy * sv.vy + sv.vz * sv.vz);
-  return {
-    speed,
-    distanceFromEarth:   r,
-    altitudeAboveEarth:  r - R_EARTH,
-  };
+
+  const metH = (utcMs - LAUNCH_MS) / 3600000;
+  const inLunarSOI = metH >= LUNAR_SOI_ENTRY_MET_H && metH <= LUNAR_SOI_EXIT_MET_H;
+
+  let altitude: number;
+  let altitudeBody: "earth" | "moon";
+
+  if (inLunarSOI) {
+    const moon = getMoonEME2000At(utcMs);
+    const dx = sv.x - moon.x;
+    const dy = sv.y - moon.y;
+    const dz = sv.z - moon.z;
+    const distToMoon = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    altitude = distToMoon - R_MOON;
+    altitudeBody = "moon";
+  } else {
+    altitude = r - R_EARTH;
+    altitudeBody = "earth";
+  }
+
+  return { speed, distanceFromEarth: r, altitude, altitudeBody };
 }
 
 // ─── Trajectory points for 3D curve ──────────────────────────────────────
@@ -168,11 +254,10 @@ export function getPositionAtMET(metHours: number): THREE.Vector3 {
 }
 
 // ─── Moon position ─────────────────────────────────────────────────────────
-// Moon EME2000 position from JPL DE441, converted to Three.js scene units.
-// Uses the Moon's actual position at closest approach so the trajectory
-// visually passes near the Moon at the correct distance.
+// Moon position for 3D scene rendering, fixed at closest approach epoch so
+// the trajectory visually passes near the Moon sphere at the correct distance.
 export function getMoonPosition(): THREE.Vector3 {
-  return eme2000ToThree(MOON_EME_X, MOON_EME_Y, MOON_EME_Z);
+  return eme2000ToThree(MOON_SCENE_EME.x, MOON_SCENE_EME.y, MOON_SCENE_EME.z);
 }
 
 // ─── OEM metadata ──────────────────────────────────────────────────────────

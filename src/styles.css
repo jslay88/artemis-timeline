@@ -88,6 +88,8 @@ html, body {
   font-weight: 600;
   letter-spacing: 0.12em;
   color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
 }
 
 .topbar__sep { color: var(--border-hi); font-weight: 300; }

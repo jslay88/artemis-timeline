@@ -287,7 +287,9 @@ function updateDashboard() {
 
   if (telSpeed)    telSpeed.textContent    = tel.speed.toFixed(2);
   if (telDistance) telDistance.textContent = Math.round(tel.distanceFromEarth).toLocaleString();
-  if (telAltitude) telAltitude.textContent = Math.round(tel.altitudeAboveEarth).toLocaleString();
+  if (telAltitude) telAltitude.textContent = Math.round(tel.altitude).toLocaleString();
+  const altBody = document.getElementById("tel-altitude-body");
+  if (altBody) altBody.textContent = tel.altitudeBody === "moon" ? "☽" : "⊕";
 
   // ── Orbit phase label ──
   if (orbitPhaseLabel && state.phase === "flight") {
