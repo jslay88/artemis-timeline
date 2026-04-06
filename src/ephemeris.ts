@@ -131,6 +131,81 @@ function parseOEM(text: string): StateVector[] {
 // Parse once at module load (runs synchronously during JS init)
 const _sv: StateVector[] = parseOEM(rawOem);
 
+// ─── Pre-OEM backward propagation ──────────────────────────────────────────
+// The OEM starts at MET +3.37h (post-TLI), missing the launch-to-TLI segment.
+// Backward-propagate the first OEM state under Earth-only gravity (Velocity
+// Verlet) to fill the gap with a physically correct elliptical departure arc.
+const GM_EARTH = 398600.4418; // km³/s²
+
+(function prependPreOemStates(): void {
+  if (_sv.length === 0) return;
+  const sv0 = _sv[0];
+  const gapMs = sv0.utcMs - LAUNCH_MS;
+  if (gapMs <= 0) return;
+
+  let px = sv0.x, py = sv0.y, pz = sv0.z;
+  let vx = sv0.vx, vy = sv0.vy, vz = sv0.vz;
+  const DT = 30; // seconds per integration step
+  const totalSteps = Math.floor(gapMs / (DT * 1000));
+  const OUTPUT_INTERVAL = 8; // emit a state every 8 steps (~4 min)
+  const MIN_R = R_EARTH + 180; // stop above parking-orbit altitude
+
+  const prepend: StateVector[] = [];
+
+  for (let step = 1; step <= totalSteps; step++) {
+    // Velocity Verlet backward step
+    let r2 = px * px + py * py + pz * pz;
+    let r  = Math.sqrt(r2);
+    let f  = -GM_EARTH / (r2 * r);
+    let ax = f * px, ay = f * py, az = f * pz;
+
+    const vxh = vx - 0.5 * ax * DT;
+    const vyh = vy - 0.5 * ay * DT;
+    const vzh = vz - 0.5 * az * DT;
+
+    px -= vxh * DT;
+    py -= vyh * DT;
+    pz -= vzh * DT;
+
+    r2 = px * px + py * py + pz * pz;
+    r  = Math.sqrt(r2);
+    if (r <= MIN_R) break;
+
+    f  = -GM_EARTH / (r2 * r);
+    ax = f * px; ay = f * py; az = f * pz;
+
+    vx = vxh - 0.5 * ax * DT;
+    vy = vyh - 0.5 * ay * DT;
+    vz = vzh - 0.5 * az * DT;
+
+    if (step % OUTPUT_INTERVAL === 0) {
+      prepend.push({
+        utcMs: sv0.utcMs - step * DT * 1000,
+        x: px, y: py, z: pz,
+        vx, vy, vz,
+      });
+    }
+  }
+
+  // Add a final point on Earth's surface for the very start (launch)
+  const lastPre = prepend.length > 0 ? prepend[prepend.length - 1] : sv0;
+  const rLast = Math.sqrt(lastPre.x ** 2 + lastPre.y ** 2 + lastPre.z ** 2);
+  const surfScale = R_EARTH / rLast;
+  prepend.push({
+    utcMs: LAUNCH_MS,
+    x: lastPre.x * surfScale,
+    y: lastPre.y * surfScale,
+    z: lastPre.z * surfScale,
+    vx: lastPre.vx,
+    vy: lastPre.vy,
+    vz: lastPre.vz,
+  });
+
+  // Reverse (they were generated newest-first) and prepend to _sv
+  prepend.reverse();
+  _sv.unshift(...prepend);
+})();
+
 // ─── Binary search ─────────────────────────────────────────────────────────
 function bsearch(ms: number): number {
   let lo = 0, hi = _sv.length - 2;
@@ -201,9 +276,10 @@ export function getTelemetry(utcMs: number): TelemetrySample {
 
 // ─── Trajectory points for 3D curve ──────────────────────────────────────
 // Spans the FULL mission: Launch (MET 0) → Splashdown (MET 217.767h).
-// Pre-OEM segment (launch → first OEM point) and post-OEM segment (last OEM
-// point → splashdown) are smoothly interpolated from Earth's surface.
-// Time-uniform sampling ensures curve parameter `t` maps linearly to MET.
+// Pre-OEM states are filled by backward Keplerian propagation (see above).
+// Post-OEM segment (last data point → splashdown) is smoothly interpolated
+// back to Earth's surface. Time-uniform sampling ensures curve parameter `t`
+// maps linearly to MET.
 const TOTAL_MET_H = 217.767;
 
 export function getTrajectoryPoints(n = 800): THREE.Vector3[] {
@@ -211,31 +287,22 @@ export function getTrajectoryPoints(n = 800): THREE.Vector3[] {
 
   const missionStartMs = LAUNCH_MS;
   const missionEndMs   = LAUNCH_MS + TOTAL_MET_H * 3600000;
-  const oemStartMs     = _sv[0].utcMs;
-  const oemEndMs       = _sv[_sv.length - 1].utcMs;
+  const dataEndMs      = _sv[_sv.length - 1].utcMs;
 
-  const firstOem = eme2000ToThree(_sv[0].x, _sv[0].y, _sv[0].z);
-  const lastOem  = eme2000ToThree(
+  const lastData  = eme2000ToThree(
     _sv[_sv.length - 1].x, _sv[_sv.length - 1].y, _sv[_sv.length - 1].z,
   );
-  const launchSurf = firstOem.clone().normalize();
-  const splashSurf = lastOem.clone().normalize();
+  const splashSurf = lastData.clone().normalize();
 
   const out: THREE.Vector3[] = [];
   for (let i = 0; i < n; i++) {
     const frac = i / (n - 1);
     const tMs  = missionStartMs + frac * (missionEndMs - missionStartMs);
 
-    if (tMs < oemStartMs) {
-      // Pre-OEM: smooth arc from Earth surface toward the first OEM position
-      const f = (tMs - missionStartMs) / (oemStartMs - missionStartMs);
-      const s = f * f * (3 - 2 * f); // smoothstep for natural launch arc
-      out.push(new THREE.Vector3().lerpVectors(launchSurf, firstOem, s));
-    } else if (tMs > oemEndMs) {
-      // Post-OEM: smooth arc from last OEM position back to Earth surface
-      const f = (tMs - oemEndMs) / (missionEndMs - oemEndMs);
+    if (tMs > dataEndMs) {
+      const f = (tMs - dataEndMs) / (missionEndMs - dataEndMs);
       const s = f * f * (3 - 2 * f);
-      out.push(new THREE.Vector3().lerpVectors(lastOem, splashSurf, s));
+      out.push(new THREE.Vector3().lerpVectors(lastData, splashSurf, s));
     } else {
       const sv = interpolateState(tMs);
       out.push(eme2000ToThree(sv.x, sv.y, sv.z));
