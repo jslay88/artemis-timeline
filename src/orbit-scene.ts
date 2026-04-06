@@ -211,7 +211,7 @@ function createTrailSystem(scene: THREE.Scene): TrailSystem {
 
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      color: { value: new THREE.Color(0xff8844) },
+      color: { value: new THREE.Color(0x993311) },
       pixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
     },
     vertexShader: `
@@ -222,7 +222,7 @@ function createTrailSystem(scene: THREE.Scene): TrailSystem {
       void main() {
         vAlpha = alpha;
         vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = size * pixelRatio * (200.0 / -mvPos.z);
+        gl_PointSize = min(size * pixelRatio * (200.0 / -mvPos.z), 40.0);
         gl_Position = projectionMatrix * mvPos;
       }
     `,
@@ -257,8 +257,8 @@ function createTrailSystem(scene: THREE.Scene): TrailSystem {
 
   function tick(): void {
     for (let i = 0; i < COUNT; i++) {
-      alphas[i] *= 0.96;
-      sizes[i] *= 0.985;
+      alphas[i] *= 0.88;
+      sizes[i] *= 0.92;
     }
     geo.attributes.position.needsUpdate = true;
     geo.attributes.alpha.needsUpdate = true;
@@ -319,6 +319,8 @@ export interface OrbitSceneApi {
   resize: () => void;
   toggleFullscreen: () => void;
   flyTo: (target: THREE.Vector3) => void;
+  flyToMET: (metHours: number) => void;
+  focusCraft: () => void;
   updateLabels: () => void;
   dispose: () => void;
 }
@@ -366,7 +368,7 @@ export function createOrbitScene(
   controls.enableDamping = true;
   controls.dampingFactor = 0.06;
   controls.target.set(-10, -14, 26);
-  controls.minDistance = 3;
+  controls.minDistance = 0.05;
   controls.maxDistance = 300;
   controls.autoRotate = true;
   controls.autoRotateSpeed = 0.3;
@@ -374,12 +376,26 @@ export function createOrbitScene(
   controls.minPolarAngle = Math.PI * 0.08;
 
   let autoRotateTimer: ReturnType<typeof setTimeout>;
+  let autoRotateEnabled = true; // user-controlled master toggle
+
+  function setAutoRotate(enabled: boolean): void {
+    autoRotateEnabled = enabled;
+    controls.autoRotate = enabled;
+    const btn = document.getElementById("orbit-autorotate");
+    if (btn) btn.dataset.active = String(enabled);
+  }
+
   controls.addEventListener("start", () => {
     controls.autoRotate = false;
     clearTimeout(autoRotateTimer);
   });
   controls.addEventListener("end", () => {
+    if (!autoRotateEnabled) return;
     autoRotateTimer = setTimeout(() => { controls.autoRotate = true; }, 8000);
+  });
+
+  document.getElementById("orbit-autorotate")?.addEventListener("click", () => {
+    setAutoRotate(!autoRotateEnabled);
   });
 
   /* ——— Follow state — which object the camera orbits ——— */
@@ -625,13 +641,15 @@ export function createOrbitScene(
   tubeGeo.setAttribute("uParam", new THREE.BufferAttribute(uValues, 1));
 
   const tubeUniforms = { progress: { value: 0 } };
-  scene.add(new THREE.Mesh(tubeGeo, new THREE.ShaderMaterial({
+  const tubeMesh = new THREE.Mesh(tubeGeo, new THREE.ShaderMaterial({
     vertexShader: TUBE_VERT,
     fragmentShader: TUBE_FRAG,
     uniforms: tubeUniforms,
     transparent: true,
     depthWrite: false,
-  })));
+  }));
+  tubeMesh.renderOrder = 10;
+  scene.add(tubeMesh);
 
   // TubeGeometry uses arc-length parameterization (getPointAt) but the
   // spacecraft position uses raw parameter (getPoint). Build a lookup
@@ -652,15 +670,51 @@ export function createOrbitScene(
      ════════════════════════════════════════════ */
 
   const { group: craft, engineGlow } = buildOrionPlaceholder();
+  engineGlow.visible = false;
   scene.add(craft);
   loadOrionModel(craft, base, loadMgr);
   const craftForward = new THREE.Vector3(0, 0, -1);
   const trail = createTrailSystem(scene);
 
-  const posMarker = new THREE.Mesh(
-    new THREE.SphereGeometry(0.2, 16, 16),
-    new THREE.MeshBasicMaterial({ color: 0xFC3D21, transparent: true, opacity: 0.35 })
+  /* Depth mask — invisible sphere that punches a hole in the depth buffer
+     so the tube and milestone markers behind it are not rendered there */
+  const posMask = new THREE.Mesh(
+    new THREE.SphereGeometry(0.18, 16, 16),
+    new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, side: THREE.FrontSide })
   );
+  posMask.renderOrder = 5;
+  scene.add(posMask);
+
+  /* Radial gradient glow marker — bright centre, fades to transparent at edges */
+  const posMarkerUniforms = { pulse: { value: 0.0 } };
+  const posMarker = new THREE.Mesh(
+    new THREE.SphereGeometry(0.15, 32, 32),
+    new THREE.ShaderMaterial({
+      uniforms: posMarkerUniforms,
+      vertexShader: `
+        varying vec3 vNormal;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float pulse;
+        varying vec3 vNormal;
+        void main() {
+          // dot with view direction gives 1.0 at centre facing camera, 0.0 at rim
+          float facing = abs(dot(vNormal, vec3(0.0, 0.0, 1.0)));
+          float glow = pow(facing, 1.8) * pulse;
+          gl_FragColor = vec4(0.9, 0.08, 0.04, glow * 0.22);
+        }
+      `,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.FrontSide,
+    })
+  );
+  posMarker.renderOrder = 11;
   scene.add(posMarker);
 
   /* ════════════════════════════════════════════
@@ -703,6 +757,7 @@ export function createOrbitScene(
       new THREE.MeshBasicMaterial({ color: ms.color })
     );
     dot.position.copy(pos);
+    dot.renderOrder = 10;
     scene.add(dot);
 
     const ringMat = new THREE.MeshBasicMaterial({
@@ -710,6 +765,7 @@ export function createOrbitScene(
     });
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.5, 32), ringMat);
     ring.position.copy(pos);
+    ring.renderOrder = 10;
     scene.add(ring);
 
     milestoneMeshes.push({ dot, ring, pos: pos.clone(), data: ms });
@@ -796,7 +852,7 @@ export function createOrbitScene(
     if (bodyHits.length > 0) {
       const obj = bodyHits[0].object;
       if (obj === posMarker) {
-        focusOn('craft', posMarker.position.clone(), 4);
+        focusOn('craft', posMarker.position.clone(), 0.4);
       } else if (obj === earth) {
         focusOn('earth', new THREE.Vector3(0, 0, 0), 4);
       } else if (obj === moon) {
@@ -831,7 +887,7 @@ export function createOrbitScene(
       duration: 2.0, ease: "power3.inOut",
       onComplete: () => {
         followingActive = true;
-        controls.autoRotate = true;
+        if (autoRotateEnabled) controls.autoRotate = true;
       },
     });
   }
@@ -839,6 +895,23 @@ export function createOrbitScene(
   /* Keep flyTo for external API backwards-compat */
   function flyTo(target: THREE.Vector3): void {
     focusOn('milestone', target, 8);
+  }
+
+  function flyToMET(metHours: number): void {
+    // Find closest milestone to given MET
+    const ms = MILESTONES.reduce((a, b) =>
+      Math.abs(a.metHours - metHours) < Math.abs(b.metHours - metHours) ? a : b
+    );
+    const mesh = milestoneMeshes.find((m) => m.data.key === ms.key);
+    if (mesh) focusOn('milestone', mesh.pos, 8);
+  }
+
+  function focusCraft(): void {
+    const rawProgress = clock.getProgress();
+    const metHoursNow = rawProgress * TOTAL_MET_HOURS;
+    const uNow = metToU(metHoursNow);
+    const craftPos = curve.getPoint(Math.max(0, Math.min(1, uNow)));
+    focusOn('craft', craftPos, 0.4);
   }
 
   /* Controls hint */
@@ -851,6 +924,19 @@ export function createOrbitScene(
   wrap.appendChild(hint);
   setTimeout(() => { hint.style.opacity = "0"; }, 5000);
   setTimeout(() => hint.remove(), 6500);
+
+  /* Reset button — fly back to overview */
+  document.getElementById("orbit-reset")?.addEventListener("click", () => {
+    followingActive = false;
+    followTarget = 'craft';
+    gsap.killTweensOf(controls.target);
+    gsap.killTweensOf(camera.position);
+    gsap.to(camera.position, { x: 20, y: 35, z: 90, duration: 2.0, ease: "power3.inOut" });
+    gsap.to(controls.target, {
+      x: -10, y: -14, z: 26, duration: 2.0, ease: "power3.inOut",
+      onComplete: () => { if (autoRotateEnabled) controls.autoRotate = true; },
+    });
+  });
 
   /* ════════════════════════════════════════════
      Animation loop
@@ -880,13 +966,12 @@ export function createOrbitScene(
     craft.position.copy(pos);
     craft.quaternion.setFromUnitVectors(craftForward, tangent);
 
-    /* Engine glow pulse */
-    (engineGlow.material as THREE.MeshBasicMaterial).opacity = 0.15 + 0.1 * Math.sin(now * 0.006);
-
-    /* Position marker */
+    /* Position marker + depth mask */
+    posMask.position.copy(pos);
     posMarker.position.copy(pos);
-    (posMarker.material as THREE.MeshBasicMaterial).opacity = 0.08 + 0.07 * Math.sin(now * 0.004);
-    posMarker.scale.setScalar(1 + 0.2 * Math.sin(now * 0.003));
+    posMarkerUniforms.pulse.value = 0.15 + 0.1 * Math.sin(now * 0.0012);
+    posMarker.scale.setScalar(1 + 0.08 * Math.sin(now * 0.003));
+    posMask.scale.copy(posMarker.scale);
 
     /* Trail particles — emit every other frame */
     if (frameCount % 2 === 0) trail.push(pos);
@@ -918,7 +1003,7 @@ export function createOrbitScene(
     /* Distance-based milestone marker scaling — shrink when camera is close */
     for (const { dot, ring, pos: mpos } of milestoneMeshes) {
       const dist = camera.position.distanceTo(mpos);
-      const scale = THREE.MathUtils.clamp(dist / 5, 0.12, 1.0);
+      const scale = THREE.MathUtils.clamp(dist / 5, 0.02, 0.2);
       dot.scale.setScalar(scale);
       ring.scale.setScalar(scale);
     }
@@ -998,6 +1083,8 @@ export function createOrbitScene(
     resize,
     toggleFullscreen,
     flyTo,
+    flyToMET,
+    focusCraft,
     updateLabels,
     dispose() {
       cancelAnimationFrame(raf);
