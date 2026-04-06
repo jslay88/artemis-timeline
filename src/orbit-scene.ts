@@ -128,17 +128,19 @@ const TUBE_FRAG = `
 uniform float progress;
 varying float vU;
 void main() {
-  float t = 1.0 - smoothstep(progress - 0.012, progress + 0.012, vU);
-  vec3 bright = vec3(1.0, 0.95, 0.90);
-  vec3 dim = vec3(0.10, 0.07, 0.05);
-  vec3 orange = vec3(0.988, 0.239, 0.129);
-  vec3 color = mix(dim, bright, t);
-  // Leading-edge orange tint
-  float lead = smoothstep(progress - 0.025, progress, vU) * (1.0 - smoothstep(progress, progress + 0.005, vU));
-  color = mix(color, orange, lead * 2.5 * t);
-  float alpha = mix(0.08, 0.55, t);
-  float pulse = 0.88 + 0.12 * sin(vU * 120.0 + progress * 40.0);
-  alpha *= mix(1.0, pulse, t);
+  float traveled = 1.0 - smoothstep(progress - 0.004, progress + 0.004, vU);
+
+  // Traveled = solid white, future = dim blue-gray "planned path"
+  vec3 traveledColor = vec3(1.0, 1.0, 1.0);
+  vec3 futureColor   = vec3(0.25, 0.30, 0.40);
+  vec3 color = mix(futureColor, traveledColor, traveled);
+
+  // Orange accent at the spacecraft's current position
+  float lead = smoothstep(progress - 0.02, progress, vU)
+             * (1.0 - smoothstep(progress, progress + 0.008, vU));
+  color = mix(color, vec3(0.988, 0.239, 0.129), lead * 1.5);
+
+  float alpha = mix(0.18, 0.7, traveled);
   gl_FragColor = vec4(color, alpha);
 }`;
 
@@ -626,6 +628,20 @@ export function createOrbitScene(
     depthWrite: false,
   })));
 
+  // TubeGeometry uses arc-length parameterization (getPointAt) but the
+  // spacecraft position uses raw parameter (getPoint). Build a lookup
+  // to convert raw t → arc-length fraction for the shader.
+  const ARC_LUT_N = 2000;
+  const arcLengths = curve.getLengths(ARC_LUT_N);
+  const totalArcLen = arcLengths[ARC_LUT_N];
+  function rawToArcFraction(rawU: number): number {
+    const idx = rawU * ARC_LUT_N;
+    const i = Math.min(Math.floor(idx), ARC_LUT_N - 1);
+    const frac = idx - i;
+    const len = arcLengths[i] + frac * (arcLengths[i + 1] - arcLengths[i]);
+    return len / totalArcLen;
+  }
+
   /* ════════════════════════════════════════════
      Spacecraft + trail
      ════════════════════════════════════════════ */
@@ -839,8 +855,8 @@ export function createOrbitScene(
     if (frameCount % 2 === 0) trail.push(pos);
     trail.tick();
 
-    /* Tube progress */
-    tubeUniforms.progress.value = u;
+    /* Tube progress — convert raw parameter to arc-length fraction */
+    tubeUniforms.progress.value = rawToArcFraction(u);
 
     /* LOD — swap in HD textures when camera is close */
     checkCloudLOD();
