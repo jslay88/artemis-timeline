@@ -162,7 +162,7 @@ html, body {
 }
 
 /* Locale picker — custom pill dropdown */
-.locale-picker { display: flex; align-items: center; position: relative; }
+.locale-picker { display: flex; align-items: center; }
 
 .locale-picker__btn {
   display: flex;
@@ -206,16 +206,15 @@ html, body {
 }
 
 .locale-picker__menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
+  /* Fixed so it escapes dashboard overflow:hidden */
+  position: fixed;
   background: #111;
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-  z-index: 999;
-  min-width: 130px;
+  z-index: 9999;
+  min-width: 140px;
   display: none;
 }
 .locale-picker__menu[data-open] { display: block; }
@@ -1295,6 +1294,7 @@ html, body {
   /* ── Top bar ── */
   .topbar {
     gap: 6px;
+    position: relative;
     padding: 0 10px;
     overflow: hidden;
   }
@@ -1313,7 +1313,13 @@ html, body {
     text-overflow: ellipsis;
     max-width: 120px;
   }
-  .topbar__met { gap: 4px; flex-shrink: 0; }
+  .topbar__met {
+    gap: 4px;
+    flex-shrink: 0;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
   .topbar__met-label { font-size: 9px; }
   .topbar__met-value { font-size: 13px; }
   .topbar__right {
@@ -1326,11 +1332,9 @@ html, body {
     padding: 6px 12px 6px 10px;
     border-radius: 20px;
   }
-  /* Open upward on mobile so it doesn't clip off-screen */
-  .locale-picker__menu {
-    top: auto;
-    bottom: calc(100% + 8px);
-    right: 0;
+  .locale-picker__option {
+    padding: 11px 14px;
+    font-size: 13px;
   }
 
   /* ── Status bar / footer (lives inside sidebar on mobile) ── */

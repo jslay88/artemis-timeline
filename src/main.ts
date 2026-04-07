@@ -84,8 +84,25 @@ initI18n();
 
     updateBtn(getLocale());
 
-    // Stop clicks inside the menu from bubbling to the document close handler
-    menu.addEventListener("click", (e) => e.stopPropagation());
+    // Position menu using fixed coords so it escapes dashboard overflow:hidden
+    function positionMenu() {
+      const r = btn.getBoundingClientRect();
+      const menuH = menu.offsetHeight || 300;
+      const spaceBelow = window.innerHeight - r.bottom;
+      if (spaceBelow >= menuH + 8 || spaceBelow > r.top) {
+        // Open downward
+        menu.style.top  = `${r.bottom + 6}px`;
+        menu.style.bottom = "";
+      } else {
+        // Open upward
+        menu.style.bottom = `${window.innerHeight - r.top + 6}px`;
+        menu.style.top = "";
+      }
+      menu.style.right = `${window.innerWidth - r.right}px`;
+    }
+
+    // Stop pointer events inside menu from bubbling to the document close handler
+    menu.addEventListener("pointerdown", (e) => e.stopPropagation());
 
     // Toggle open/close
     btn.addEventListener("click", (e) => {
@@ -97,6 +114,7 @@ initI18n();
       } else {
         menu.setAttribute("data-open", "");
         btn.setAttribute("aria-expanded", "true");
+        positionMenu();
       }
     });
     document.addEventListener("pointerdown", () => {
@@ -104,8 +122,9 @@ initI18n();
       btn.setAttribute("aria-expanded", "false");
     });
 
+    // Append menu to body so it's never clipped by any ancestor overflow
     picker.appendChild(btn);
-    picker.appendChild(menu);
+    document.body.appendChild(menu);
     onLocaleChange(updateBtn);
   }
 }
