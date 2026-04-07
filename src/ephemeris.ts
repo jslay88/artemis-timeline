@@ -100,6 +100,7 @@ export interface StateVector {
 export interface TelemetrySample {
   speed: number;               // km/s (magnitude of velocity)
   distanceFromEarth: number;   // km (from Earth center)
+  distanceFromMoon: number;    // km (from Moon center)
   altitude: number;            // km (above surface of SOI body)
   altitudeBody: "earth" | "moon";
 }
@@ -258,20 +259,21 @@ export function getTelemetry(utcMs: number): TelemetrySample {
   let altitude: number;
   let altitudeBody: "earth" | "moon";
 
+  const moon = getMoonEME2000At(utcMs);
+  const mdx = sv.x - moon.x;
+  const mdy = sv.y - moon.y;
+  const mdz = sv.z - moon.z;
+  const distanceFromMoon = Math.sqrt(mdx * mdx + mdy * mdy + mdz * mdz);
+
   if (inLunarSOI) {
-    const moon = getMoonEME2000At(utcMs);
-    const dx = sv.x - moon.x;
-    const dy = sv.y - moon.y;
-    const dz = sv.z - moon.z;
-    const distToMoon = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    altitude = distToMoon - R_MOON;
+    altitude = distanceFromMoon - R_MOON;
     altitudeBody = "moon";
   } else {
     altitude = r - R_EARTH;
     altitudeBody = "earth";
   }
 
-  return { speed, distanceFromEarth: r, altitude, altitudeBody };
+  return { speed, distanceFromEarth: r, distanceFromMoon, altitude, altitudeBody };
 }
 
 // ─── Trajectory points for 3D curve ──────────────────────────────────────

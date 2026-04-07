@@ -130,17 +130,17 @@ varying float vU;
 void main() {
   float traveled = 1.0 - smoothstep(progress - 0.004, progress + 0.004, vU);
 
-  // Traveled = solid white, future = dim blue-gray "planned path"
-  vec3 traveledColor = vec3(1.0, 1.0, 1.0);
-  vec3 futureColor   = vec3(0.25, 0.30, 0.40);
+  // Traveled = NASA orange #FC3D21 linearized (sRGB->linear)
+  vec3 traveledColor = vec3(0.961, 0.047, 0.014);
+  vec3 futureColor   = vec3(0.25, 0.25, 0.25);
   vec3 color = mix(futureColor, traveledColor, traveled);
 
-  // Orange accent at the spacecraft's current position
-  float lead = smoothstep(progress - 0.02, progress, vU)
-             * (1.0 - smoothstep(progress, progress + 0.008, vU));
-  color = mix(color, vec3(0.988, 0.239, 0.129), lead * 1.5);
+  // Bright leading edge at spacecraft position
+  float lead = smoothstep(progress - 0.015, progress, vU)
+             * (1.0 - smoothstep(progress, progress + 0.006, vU));
+  color = mix(color, vec3(1.0, 0.35, 0.18), lead * 2.0);
 
-  float alpha = mix(0.18, 0.7, traveled);
+  float alpha = mix(0.16, 0.82, traveled);
   gl_FragColor = vec4(color, alpha);
 }`;
 
@@ -211,7 +211,7 @@ function createTrailSystem(scene: THREE.Scene): TrailSystem {
 
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      color: { value: new THREE.Color(0x993311) },
+      color: { value: new THREE.Color(0xbb4422) },
       pixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
     },
     vertexShader: `
@@ -222,7 +222,7 @@ function createTrailSystem(scene: THREE.Scene): TrailSystem {
       void main() {
         vAlpha = alpha;
         vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = min(size * pixelRatio * (200.0 / -mvPos.z), 40.0);
+        gl_PointSize = min(size * pixelRatio * (200.0 / -mvPos.z), 20.0);
         gl_Position = projectionMatrix * mvPos;
       }
     `,
@@ -231,12 +231,12 @@ function createTrailSystem(scene: THREE.Scene): TrailSystem {
       varying float vAlpha;
       void main() {
         float d = length(gl_PointCoord - vec2(0.5));
-        float a = smoothstep(0.5, 0.1, d) * vAlpha;
+        float a = smoothstep(0.5, 0.2, d) * vAlpha;
         gl_FragColor = vec4(color, a);
       }
     `,
     transparent: true,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
     depthWrite: false,
   });
 
@@ -250,8 +250,8 @@ function createTrailSystem(scene: THREE.Scene): TrailSystem {
     positions[i3] = pos.x;
     positions[i3 + 1] = pos.y;
     positions[i3 + 2] = pos.z;
-    alphas[head] = 1.0;
-    sizes[head] = 2.5;
+    alphas[head] = 0.55;
+    sizes[head] = 1.2;
     head = (head + 1) % COUNT;
   }
 
@@ -386,6 +386,8 @@ export function createOrbitScene(
   }
 
   controls.addEventListener("start", () => {
+    gsap.killTweensOf(camera.position);
+    gsap.killTweensOf(controls.target);
     controls.autoRotate = false;
     clearTimeout(autoRotateTimer);
   });
@@ -625,7 +627,7 @@ export function createOrbitScene(
 
   const TUBE_SEG = 800;
   const TUBE_RAD = 12;
-  const tubeGeo = new THREE.TubeGeometry(curve, TUBE_SEG, 0.05, TUBE_RAD, false);
+  const tubeGeo = new THREE.TubeGeometry(curve, TUBE_SEG, 0.0125, TUBE_RAD, false);
 
   const posCount = tubeGeo.attributes.position.count;
   const rings = TUBE_SEG + 1;
@@ -676,46 +678,14 @@ export function createOrbitScene(
   const craftForward = new THREE.Vector3(0, 0, -1);
   const trail = createTrailSystem(scene);
 
-  /* Depth mask — invisible sphere that punches a hole in the depth buffer
-     so the tube and milestone markers behind it are not rendered there */
+  /* Depth mask — invisible sphere that punches a gap in the tube at spacecraft position */
   const posMask = new THREE.Mesh(
-    new THREE.SphereGeometry(0.18, 16, 16),
+    new THREE.SphereGeometry(0.22, 16, 16),
     new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, side: THREE.FrontSide })
   );
   posMask.renderOrder = 5;
   scene.add(posMask);
 
-  /* Radial gradient glow marker — bright centre, fades to transparent at edges */
-  const posMarkerUniforms = { pulse: { value: 0.0 } };
-  const posMarker = new THREE.Mesh(
-    new THREE.SphereGeometry(0.15, 32, 32),
-    new THREE.ShaderMaterial({
-      uniforms: posMarkerUniforms,
-      vertexShader: `
-        varying vec3 vNormal;
-        void main() {
-          vNormal = normalize(normalMatrix * normal);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform float pulse;
-        varying vec3 vNormal;
-        void main() {
-          // dot with view direction gives 1.0 at centre facing camera, 0.0 at rim
-          float facing = abs(dot(vNormal, vec3(0.0, 0.0, 1.0)));
-          float glow = pow(facing, 1.8) * pulse;
-          gl_FragColor = vec4(0.9, 0.08, 0.04, glow * 0.22);
-        }
-      `,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      side: THREE.FrontSide,
-    })
-  );
-  posMarker.renderOrder = 11;
-  scene.add(posMarker);
 
   /* ════════════════════════════════════════════
      Milestones — dots, sprites, labels, click-to-fly
@@ -724,8 +694,12 @@ export function createOrbitScene(
   interface MilestoneMesh {
     dot: THREE.Mesh;
     ring: THREE.Mesh;
+    line: THREE.Line;
     pos: THREE.Vector3;
+    tipPos: THREE.Vector3;
     data: Milestone;
+    svgLine: SVGLineElement;
+    svgDot: SVGCircleElement;
   }
   interface Label {
     el: HTMLElement;
@@ -738,17 +712,24 @@ export function createOrbitScene(
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
 
+  const CLUSTER_PX   = 44;   // screen-dist threshold to group dots into one stack
+  const LABEL_H      = 26;   // approx label height px
+  const LABEL_GAP    = 4;    // gap between stacked labels px
+  const RING_RADIUS  = 0.52; // world-space radius of outer ring geometry + margin
+  const MIN_CLEAR_PX = 8;    // minimum px clearance above ring screen edge
+
+  /* SVG overlay for leader lines */
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;";
+  wrap.appendChild(svg);
+
   for (const ms of MILESTONES) {
     let pos: THREE.Vector3;
 
     if (ms.key === "ms.launch" || ms.key === "ms.splashdown") {
-      // Launch and Splashdown happen on/near Earth's surface.
-      // Get the OEM position at the nearest available time and project
-      // it onto the Earth's surface (1.0 radius) so the dot sits on Earth.
       const rawPos = getPositionAtMET(ms.metHours);
       pos = rawPos.clone().normalize().multiplyScalar(EARTH_RADIUS * 1.02);
     } else {
-      // All other milestones: position directly from OEM ephemeris data.
       pos = getPositionAtMET(ms.metHours);
     }
 
@@ -768,14 +749,32 @@ export function createOrbitScene(
     ring.renderOrder = 10;
     scene.add(ring);
 
-    milestoneMeshes.push({ dot, ring, pos: pos.clone(), data: ms });
+    /* SVG line + tip dot for this milestone */
+    const hex = `#${new THREE.Color(ms.color).getHexString()}`;
+    const svgLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    svgLine.setAttribute("stroke", hex);
+    svgLine.setAttribute("stroke-width", "1");
+    svgLine.setAttribute("stroke-opacity", "0.6");
+    svg.appendChild(svgLine);
+    // Small filled circle at line tip
+    const svgDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    svgDot.setAttribute("r", "2");
+    svgDot.setAttribute("fill", hex);
+    svgDot.setAttribute("fill-opacity", "0.8");
+    svg.appendChild(svgDot);
+
+    // Dummy line object to satisfy interface (no 3D line needed)
+    const line = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial());
+    const tipPos = pos.clone();
+    milestoneMeshes.push({ dot, ring, line, pos: pos.clone(), tipPos, data: ms, svgLine, svgDot });
 
     const el = document.createElement("div");
-    el.className = "orbit-label";
+    el.className = "orbit-label orbit-label--clickable";
     el.textContent = t(ms.key);
-    el.style.color = `#${new THREE.Color(ms.color).getHexString()}`;
+    el.style.color = hex;
+    el.addEventListener("click", () => focusOn('milestone', milestoneMeshes.find(m => m.data.key === ms.key)!.pos, 3));
     wrap.appendChild(el);
-    milestoneLabels.push({ el, key: ms.key, worldPos: pos.clone() });
+    milestoneLabels.push({ el, key: ms.key, worldPos: tipPos });
   }
 
   /* Body labels */
@@ -792,6 +791,25 @@ export function createOrbitScene(
     bodyLabels.push({ el, key, worldPos });
   }
 
+  /* Craft label — "ARTEMIS II" badge above spacecraft */
+  const craftLabelEl = document.createElement("div");
+  craftLabelEl.className = "orbit-label orbit-label--craft";
+  craftLabelEl.textContent = "ARTEMIS II";
+  craftLabelEl.addEventListener("click", () => focusOn('craft', posMask.position.clone(), 0.8));
+  wrap.appendChild(craftLabelEl);
+
+  /* SVG connector for craft label */
+  const craftSvgLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  craftSvgLine.setAttribute("stroke", "#FC3D21");
+  craftSvgLine.setAttribute("stroke-width", "1");
+  craftSvgLine.setAttribute("stroke-opacity", "0.55");
+  svg.appendChild(craftSvgLine);
+  const craftSvgDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  craftSvgDot.setAttribute("r", "2.5");
+  craftSvgDot.setAttribute("fill", "#FC3D21");
+  craftSvgDot.setAttribute("fill-opacity", "0.9");
+  svg.appendChild(craftSvgDot);
+
   /* Tooltip */
   const tooltip = document.createElement("div");
   tooltip.className = "orbit-tooltip";
@@ -802,36 +820,15 @@ export function createOrbitScene(
     const rect = canvas.getBoundingClientRect();
     mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
     raycaster.setFromCamera(mouse, camera);
-    const hits = raycaster.intersectObjects(milestoneMeshes.map((m) => m.dot));
-
-    if (hits.length > 0) {
-      const ms = milestoneMeshes.find((m) => m.dot === hits[0].object);
-      if (ms) {
-        const sp = ms.pos.clone().project(camera);
-        const x = (sp.x * 0.5 + 0.5) * rect.width;
-        const y = (-sp.y * 0.5 + 0.5) * rect.height;
-        const mh = ms.data.metHours;
-        const d = Math.floor(mh / 24);
-        const hr = Math.floor(mh % 24);
-        const mn = Math.floor((mh * 60) % 60);
-        tooltip.innerHTML =
-          `<strong>${t(ms.data.key)}</strong>MET ${String(d).padStart(2, "0")}/${String(hr).padStart(2, "0")}:${String(mn).padStart(2, "0")}`;
-        tooltip.style.left = `${x}px`;
-        tooltip.style.top = `${y}px`;
-        tooltip.style.display = "";
-        canvas.style.cursor = "pointer";
-      }
-    } else {
-      tooltip.style.display = "none";
-      canvas.style.cursor = "grab";
-    }
+    // Only hover-detect spacecraft/Earth/Moon — not milestone dots
+    const bodyHits = raycaster.intersectObjects([posMask, earth, moon]);
+    canvas.style.cursor = bodyHits.length > 0 ? "pointer" : "grab";
   });
 
   canvas.addEventListener("pointerleave", () => { tooltip.style.display = "none"; });
 
-  /* Click on milestone, Earth, Moon or spacecraft → fly camera to orbit it */
+  /* Click on Earth, Moon or spacecraft → fly camera to orbit it */
   canvas.addEventListener("click", (e) => {
     const rect = canvas.getBoundingClientRect();
     mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -839,20 +836,12 @@ export function createOrbitScene(
 
     raycaster.setFromCamera(mouse, camera);
 
-    // Priority 1: milestone dots
-    const milestoneHits = raycaster.intersectObjects(milestoneMeshes.map((m) => m.dot));
-    if (milestoneHits.length > 0) {
-      const ms = milestoneMeshes.find((m) => m.dot === milestoneHits[0].object);
-      if (ms) focusOn('milestone', ms.pos, 8);
-      return;
-    }
-
-    // Priority 2: spacecraft marker, Earth, Moon
-    const bodyHits = raycaster.intersectObjects([posMarker, earth, moon]);
+    // Only spacecraft marker, Earth, Moon — milestones via label click
+    const bodyHits = raycaster.intersectObjects([posMask, earth, moon]);
     if (bodyHits.length > 0) {
       const obj = bodyHits[0].object;
-      if (obj === posMarker) {
-        focusOn('craft', posMarker.position.clone(), 0.4);
+      if (obj === posMask) {
+        focusOn('craft', posMask.position.clone(), 0.8);
       } else if (obj === earth) {
         focusOn('earth', new THREE.Vector3(0, 0, 0), 4);
       } else if (obj === moon) {
@@ -894,7 +883,7 @@ export function createOrbitScene(
 
   /* Keep flyTo for external API backwards-compat */
   function flyTo(target: THREE.Vector3): void {
-    focusOn('milestone', target, 8);
+    focusOn('milestone', target, 3);
   }
 
   function flyToMET(metHours: number): void {
@@ -903,7 +892,7 @@ export function createOrbitScene(
       Math.abs(a.metHours - metHours) < Math.abs(b.metHours - metHours) ? a : b
     );
     const mesh = milestoneMeshes.find((m) => m.data.key === ms.key);
-    if (mesh) focusOn('milestone', mesh.pos, 8);
+    if (mesh) focusOn('milestone', mesh.pos, 3);
   }
 
   function focusCraft(): void {
@@ -911,7 +900,7 @@ export function createOrbitScene(
     const metHoursNow = rawProgress * TOTAL_MET_HOURS;
     const uNow = metToU(metHoursNow);
     const craftPos = curve.getPoint(Math.max(0, Math.min(1, uNow)));
-    focusOn('craft', craftPos, 0.4);
+    focusOn('craft', craftPos, 0.8);
   }
 
   /* Controls hint */
@@ -938,6 +927,50 @@ export function createOrbitScene(
     });
   });
 
+  /* ── Label / marker visibility toggles ───────────────────────────────── */
+  let labelsVisible  = true;
+  let markersVisible = true;
+
+  function setLabelsVisible(on: boolean) {
+    labelsVisible = on;
+    const btn = document.getElementById("orbit-toggle-labels");
+    if (btn) btn.dataset.active = String(on);
+    // Hide/show all orbit labels and the SVG overlay
+    wrap.querySelectorAll<HTMLElement>(".orbit-label").forEach(el => {
+      el.style.display = on ? "" : "none";
+    });
+    svg.style.display = on ? "" : "none";
+  }
+
+  function setMarkersVisible(on: boolean) {
+    markersVisible = on;
+    const btn = document.getElementById("orbit-toggle-markers");
+    if (btn) btn.dataset.active = String(on);
+    for (const mm of milestoneMeshes) {
+      mm.dot.visible  = on;
+      mm.ring.visible = on;
+    }
+  }
+
+  document.getElementById("orbit-toggle-labels")?.addEventListener("click", () => setLabelsVisible(!labelsVisible));
+  document.getElementById("orbit-toggle-markers")?.addEventListener("click", () => setMarkersVisible(!markersVisible));
+
+  /* ── Visitor counter (counterapi.dev — free, no registration, static-hosting safe) */
+  {
+    const countEl  = document.getElementById("visitor-count");
+    const wrapEl   = document.getElementById("visitor-counter");
+    if (countEl && wrapEl) {
+      fetch("https://api.counterapi.dev/v1/artemis-ii-timeline/visits/up")
+        .then(r => r.json())
+        .then((d: { count: number }) => {
+          countEl.textContent = d.count.toLocaleString();
+        })
+        .catch(() => {
+          wrapEl.style.display = "none";
+        });
+    }
+  }
+
   /* ════════════════════════════════════════════
      Animation loop
      ════════════════════════════════════════════ */
@@ -952,7 +985,6 @@ export function createOrbitScene(
     const rawProgress = clock.getProgress();
     const metHours = rawProgress * TOTAL_MET_HOURS;
     const u = metToU(metHours);
-    const now = performance.now();
     frameCount++;
 
     /* Spacecraft — position from curve so it stays exactly on the tube */
@@ -966,12 +998,8 @@ export function createOrbitScene(
     craft.position.copy(pos);
     craft.quaternion.setFromUnitVectors(craftForward, tangent);
 
-    /* Position marker + depth mask */
+    /* Depth mask + craft point light */
     posMask.position.copy(pos);
-    posMarker.position.copy(pos);
-    posMarkerUniforms.pulse.value = 0.15 + 0.1 * Math.sin(now * 0.0012);
-    posMarker.scale.setScalar(1 + 0.08 * Math.sin(now * 0.003));
-    posMask.scale.copy(posMarker.scale);
 
     /* Trail particles — emit every other frame */
     if (frameCount % 2 === 0) trail.push(pos);
@@ -1011,15 +1039,142 @@ export function createOrbitScene(
     /* Milestone rings face camera */
     for (const { ring } of milestoneMeshes) ring.lookAt(camera.position);
 
-    /* Project all labels */
-    const allLabels = [...milestoneLabels, ...bodyLabels];
-    for (const { el, worldPos } of allLabels) {
+    /* Leader lines + labels — screen-space with dynamic stacking.
+       Step 1: project all dots to screen coords.
+       Step 2: group milestones that are within STACK_GAP*2 px of each other.
+       Step 3: assign stacked offsets so labels never overlap. */
+
+    // ── Step 1: project all dots to screen space ──────────────────────────────
+    const screenPositions = new Map<string, { sx: number; sy: number; visible: boolean }>();
+    for (const mm of milestoneMeshes) {
+      const projected = mm.pos.clone().project(camera);
+      const visible = projected.z <= 1;
+      const sx = (projected.x * 0.5 + 0.5) * canvasWidth;
+      const sy = (-projected.y * 0.5 + 0.5) * canvasHeight;
+      screenPositions.set(mm.data.key, { sx, sy, visible });
+    }
+
+    // ── Step 2: cluster nearby dots, assign each label a final screen Y ───────
+    // labelY[key] = final screen Y of the label's bottom edge (line tip).
+    // For clustered dots: one shared anchor X, labels stacked bottom-up.
+    const labelPos = new Map<string, { lx: number; ly: number }>();
+    const processed = new Set<string>();
+
+    for (const mm of milestoneMeshes) {
+      if (processed.has(mm.data.key)) continue;
+      const sp = screenPositions.get(mm.data.key)!;
+
+      // Gather all milestones within CLUSTER_PX of this dot
+      const cluster = milestoneMeshes.filter(m => {
+        const o = screenPositions.get(m.data.key)!;
+        return Math.hypot(sp.sx - o.sx, sp.sy - o.sy) < CLUSTER_PX;
+      });
+      cluster.sort((a, b) => a.data.metHours - b.data.metHours);
+
+      // Cluster anchor = average dot screen position
+      const ax = cluster.reduce((s, m) => s + screenPositions.get(m.data.key)!.sx, 0) / cluster.length;
+      const ay = cluster.reduce((s, m) => s + screenPositions.get(m.data.key)!.sy, 0) / cluster.length;
+
+      // Compute the screen-space radius of the outer ring for the representative dot.
+      // Project a point RING_RADIUS world-units above the dot in camera-up direction
+      // → pixel distance = clearance needed so labels never touch the ring.
+      const ringEdgeWorld = mm.pos.clone().add(camera.up.clone().multiplyScalar(RING_RADIUS));
+      const ringEdgeProj = ringEdgeWorld.project(camera);
+      const ringEdgeSy = (-ringEdgeProj.y * 0.5 + 0.5) * canvasHeight;
+      const clearance = Math.min(Math.abs(ay - ringEdgeSy) + MIN_CLEAR_PX, canvasHeight * 0.32);
+
+      // Stack labels upward: bottom of label[0] starts at clearance above dot
+      cluster.forEach((m, i) => {
+        const ly = ay - clearance - i * (LABEL_H + LABEL_GAP);
+        labelPos.set(m.data.key, { lx: ax, ly });
+      });
+      cluster.forEach(m => processed.add(m.data.key));
+    }
+
+    // ── Step 3: occluder check + apply SVG lines and CSS labels ───────────────
+    const occluders = [earth, moon, craft];
+
+    for (const mm of milestoneMeshes) {
+      const sp = screenPositions.get(mm.data.key)!;
+
+      const toDot = mm.pos.clone().sub(camera.position);
+      const distToDot = toDot.length();
+      const occlusionRay = new THREE.Raycaster(camera.position, toDot.normalize(), 0, distToDot - 0.1);
+      const occluded = occlusionRay.intersectObjects(occluders, true).length > 0;
+
+      if (!sp.visible || occluded) {
+        mm.svgLine.setAttribute("display", "none");
+        mm.svgDot.setAttribute("display", "none");
+        const lb = milestoneLabels.find(l => l.key === mm.data.key);
+        if (lb) lb.el.style.display = "none";
+        continue;
+      }
+
+      const { lx, ly } = labelPos.get(mm.data.key) ?? { lx: sp.sx, ly: sp.sy - MIN_CLEAR_PX - LABEL_H };
+
+      // SVG line: from dot up to label tip
+      mm.svgLine.setAttribute("display", "");
+      mm.svgLine.setAttribute("x1", String(sp.sx));
+      mm.svgLine.setAttribute("y1", String(sp.sy));
+      mm.svgLine.setAttribute("x2", String(lx));
+      mm.svgLine.setAttribute("y2", String(ly));
+
+      mm.svgDot.setAttribute("display", "");
+      mm.svgDot.setAttribute("cx", String(lx));
+      mm.svgDot.setAttribute("cy", String(ly));
+
+      const lb = milestoneLabels.find(l => l.key === mm.data.key);
+      if (lb) {
+        lb.el.style.display = labelsVisible ? "" : "none";
+        lb.el.style.transform = `translate(${lx}px, ${ly}px) translate(-50%, calc(-100% - 3px))`;
+      }
+    }
+
+    /* Body labels */
+    for (const { el, worldPos } of bodyLabels) {
       const projected = worldPos.clone().project(camera);
-      if (projected.z > 1) { el.style.display = "none"; continue; }
+      if (projected.z > 1 || !labelsVisible) { el.style.display = "none"; continue; }
       el.style.display = "";
       const x = (projected.x * 0.5 + 0.5) * canvasWidth;
       const y = (-projected.y * 0.5 + 0.5) * canvasHeight;
       el.style.transform = `translate(${x}px, ${y}px) translate(-50%, calc(-100% - 10px))`;
+    }
+
+    /* Craft label — connector line from label down to spacecraft dot */
+    {
+      // Dot: project the craft position itself
+      const dotProj = pos.clone().project(camera);
+      if (dotProj.z > 1) {
+        craftLabelEl.style.display = "none";
+        craftSvgLine.setAttribute("display", "none");
+        craftSvgDot.setAttribute("display", "none");
+      } else {
+        const dotX = (dotProj.x * 0.5 + 0.5) * canvasWidth;
+        const dotY = (-dotProj.y * 0.5 + 0.5) * canvasHeight;
+
+        // Label anchor: fixed 60px above the dot in screen space, clamped so it
+        // never wanders more than 120px from the dot when far away.
+        const camDist = camera.position.distanceTo(pos);
+        const worldOffset = Math.min(Math.max(camDist * 0.10, 0.15), 0.9);
+        const anchorWorld = pos.clone().add(camera.up.clone().multiplyScalar(worldOffset));
+        const anchorProj = anchorWorld.project(camera);
+        const labelX = (anchorProj.x * 0.5 + 0.5) * canvasWidth;
+        const labelY = (-anchorProj.y * 0.5 + 0.5) * canvasHeight;
+
+        craftLabelEl.style.display = labelsVisible ? "" : "none";
+        craftLabelEl.style.transform = `translate(${labelX}px, ${labelY}px) translate(-50%, calc(-100% - 4px))`;
+
+        // SVG line from label-bottom to dot
+        craftSvgLine.setAttribute("display", labelsVisible ? "" : "none");
+        craftSvgLine.setAttribute("x1", String(labelX));
+        craftSvgLine.setAttribute("y1", String(labelY));
+        craftSvgLine.setAttribute("x2", String(dotX));
+        craftSvgLine.setAttribute("y2", String(dotY));
+
+        craftSvgDot.setAttribute("display", "");
+        craftSvgDot.setAttribute("cx", String(dotX));
+        craftSvgDot.setAttribute("cy", String(dotY));
+      }
     }
 
     controls.update();
@@ -1094,6 +1249,9 @@ export function createOrbitScene(
       trail.dispose();
       for (const { el } of milestoneLabels) el.remove();
       for (const { el } of bodyLabels) el.remove();
+      craftLabelEl.remove();
+      craftSvgLine.remove();
+      craftSvgDot.remove();
       tooltip.remove();
       scene.traverse((obj) => {
         const mesh = obj as THREE.Mesh;

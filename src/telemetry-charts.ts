@@ -32,6 +32,8 @@ interface ChartTable {
   metHours: number[];
   speed: number[];
   distance: number[];
+  distMoon: number[];
+  radialRate: number[];   // km/s opening speed from Earth (positive = moving away)
   altEarth: (number | null)[];
   altMoon: (number | null)[];
 }
@@ -44,6 +46,7 @@ function getTable(): ChartTable {
   const metHours: number[] = [];
   const speed: number[] = [];
   const distance: number[] = [];
+  const distMoon: number[] = [];
   const altEarth: (number | null)[] = [];
   const altMoon: (number | null)[] = [];
 
@@ -55,6 +58,7 @@ function getTable(): ChartTable {
     metHours.push(mh);
     speed.push(tel.speed);
     distance.push(tel.distanceFromEarth);
+    distMoon.push(tel.distanceFromMoon / 1000);
 
     if (tel.altitudeBody === "moon") {
       altEarth.push(null);
@@ -65,7 +69,16 @@ function getTable(): ChartTable {
     }
   }
 
-  _table = { metHours, speed, distance, altEarth, altMoon };
+  // Radial rate from Earth: d(distance)/dt in km/s, central difference
+  const dt = (OEM_END_MET_H / (n - 1)) * 3600; // seconds per step
+  const radialRate: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = i > 0     ? distance[i - 1] : distance[i];
+    const next = i < n - 1 ? distance[i + 1] : distance[i];
+    radialRate.push((next - prev) / (2 * dt));
+  }
+
+  _table = { metHours, speed, distance, distMoon, radialRate, altEarth, altMoon };
   return _table;
 }
 
@@ -323,6 +336,156 @@ export function createAltitudeChart(canvas: HTMLCanvasElement): MissionChart {
             font: { family: "IBM Plex Mono", size: 9 },
             maxTicksLimit: 5,
             callback: (v) => `${Number(v).toFixed(0)}k`,
+          },
+          grid: { color: COLOR_GRID },
+          border: { color: COLOR_GRID },
+        },
+      },
+    },
+    plugins: [makeNeedlePlugin(getNeedle)],
+  };
+
+  const chart = new Chart(canvas, cfg);
+
+  return {
+    chart,
+    setNeedle(metHours) {
+      needleValue = metHours;
+      chart.render();
+    },
+  };
+}
+
+// ─── Distance from Moon chart ──────────────────────────────────────────────
+const COLOR_MOON_LINE2 = "#a0a0a0";
+const COLOR_MOON_FILL2 = "rgba(160,160,160,0.05)";
+
+export function createMoonDistanceChart(canvas: HTMLCanvasElement): MissionChart {
+  const table = getTable();
+
+  let needleValue = 0;
+  const getNeedle = () => needleValue;
+
+  const cfg = baseConfig(table.metHours, table.distMoon, getNeedle, "×1000 km");
+  (cfg.data.datasets[0] as { borderColor: string; backgroundColor: string }).borderColor = COLOR_MOON_LINE2;
+  (cfg.data.datasets[0] as { borderColor: string; backgroundColor: string }).backgroundColor = COLOR_MOON_FILL2;
+  if (cfg.options?.scales?.["y"]?.ticks) {
+    (cfg.options.scales["y"].ticks as { callback?: (v: unknown) => string }).callback =
+      (v) => `${Number(v).toFixed(0)}k`;
+  }
+  const chart = new Chart(canvas, cfg);
+
+  return {
+    chart,
+    setNeedle(metHours) {
+      needleValue = metHours;
+      chart.render();
+    },
+  };
+}
+
+// ─── Radial velocity from Earth chart ─────────────────────────────────────
+// Positive = moving away from Earth (green), negative = returning (red).
+export function createRadialRateChart(canvas: HTMLCanvasElement): MissionChart {
+  const table = getTable();
+
+  let needleValue = 0;
+  const getNeedle = () => needleValue;
+
+  const dataPos = table.radialRate.map((v) => (v >= 0 ? v : null));
+  const dataNeg = table.radialRate.map((v) => (v < 0  ? v : null));
+
+  const cfg: ChartConfiguration<"line"> = {
+    type: "line",
+    data: {
+      labels: table.metHours,
+      datasets: [
+        {
+          label: "Away",
+          data: dataPos,
+          borderColor: "rgba(57,211,83,0.9)",
+          borderWidth: 1.5,
+          backgroundColor: "rgba(57,211,83,0.05)",
+          fill: true,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          tension: 0.3,
+          spanGaps: false,
+        },
+        {
+          label: "Return",
+          data: dataNeg,
+          borderColor: "rgba(252,61,33,0.9)",
+          borderWidth: 1.5,
+          backgroundColor: "rgba(252,61,33,0.05)",
+          fill: true,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          tension: 0.3,
+          spanGaps: false,
+        },
+      ],
+    },
+    options: {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
+      plugins: {
+        legend: {
+          display: true,
+          position: "top",
+          align: "end",
+          labels: {
+            color: COLOR_TEXT,
+            font: { family: "IBM Plex Mono", size: 9 },
+            boxWidth: 12,
+            boxHeight: 2,
+            padding: 6,
+          },
+        },
+        tooltip: {
+          enabled: true,
+          mode: "index",
+          intersect: false,
+          backgroundColor: "#111111",
+          borderColor: "rgba(255,255,255,0.1)",
+          borderWidth: 1,
+          titleColor: "#888888",
+          bodyColor: "#FFFFFF",
+          titleFont: { family: "IBM Plex Mono", size: 10 },
+          bodyFont:  { family: "IBM Plex Mono", size: 12, weight: "bold" },
+          filter: (item) => item.raw !== null,
+          callbacks: {
+            title: (items) => `MET ${items[0].label}h`,
+            label: (item) => {
+              const sign = Number(item.raw) >= 0 ? "↑" : "↓";
+              return `${sign} ${Math.abs(Number(item.raw)).toFixed(2)} km/s`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: "linear",
+          min: 0,
+          max: 218,
+          ticks: {
+            color: COLOR_TEXT,
+            font: { family: "IBM Plex Mono", size: 9 },
+            maxTicksLimit: 12,
+            callback: (v) => `${v}h`,
+          },
+          grid: { color: COLOR_GRID },
+          border: { color: COLOR_GRID },
+        },
+        y: {
+          type: "linear",
+          ticks: {
+            color: COLOR_TEXT,
+            font: { family: "IBM Plex Mono", size: 9 },
+            maxTicksLimit: 5,
+            callback: (v) => `${Number(v).toFixed(1)}`,
           },
           grid: { color: COLOR_GRID },
           border: { color: COLOR_GRID },
