@@ -44,118 +44,15 @@
       </header>
 
       <!-- ─── Main content ─── -->
-      <div class="main-content">
+      <div class="main-content" data-mobile-tab="orbit">
+        <!-- mobile-content-area wraps all panels; tab bar sits outside (flex sibling) -->
+        <div class="mobile-content-area">
 
-        <!-- 3D orbit view -->
-        <div class="orbit-panel" id="orbit-wrap" aria-label="3D spacecraft trajectory">
-          <canvas id="orbit-canvas"></canvas>
-          <!-- Camera controls toolbar -->
-          <div class="orbit-controls-toolbar">
-            <button type="button" class="orbit-ctrl-btn" id="orbit-craft-focus" title="Focus on spacecraft" aria-label="Focus on spacecraft">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/>
-                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
-              </svg>
-            </button>
-            <button type="button" class="orbit-ctrl-btn" id="orbit-reset" title="Reset camera view" aria-label="Reset camera view">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M3 3v5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-            <button type="button" class="orbit-ctrl-btn orbit-ctrl-btn--toggle" id="orbit-autorotate" title="Toggle auto-rotate" aria-label="Toggle auto-rotate" data-active="true">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M21 12a9 9 0 1 1-9-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                <path d="M21 3v6h-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-            <button type="button" class="orbit-ctrl-btn" id="orbit-fullscreen" title="Toggle fullscreen" aria-label="Toggle fullscreen">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-          </div>
-          <!-- Phase overlay on orbit view -->
-          <div class="orbit-phase-overlay" id="orbit-phase-overlay" aria-hidden="true">
-            <span class="orbit-phase-label" id="orbit-phase-label">—</span>
-          </div>
-        </div>
+        <!-- ─── Timeline resize gutter ─── -->
+        <!-- placed before timeline-panel so grid order matches column order -->
 
-        <!-- ─── Resize gutter ─── -->
-        <div class="resize-gutter" id="resize-gutter" aria-hidden="true"></div>
-
-        <!-- ─── Side panel ─── -->
-        <aside class="side-panel" role="complementary" aria-label="Mission data">
-
-          <!-- Live stream (always-on, muted autoplay) -->
-          <section class="stream-section" aria-label="NASA live broadcast">
-            <h2 class="panel-label">
-              <span data-i18n="sidebar.live">LIVE COVERAGE</span>
-              <span class="panel-label__sub live-dot-label" aria-hidden="true">● <span data-i18n="sidebar.nasaTv">NASA TV</span></span>
-            </h2>
-            <div class="stream-wrap">
-              <iframe
-                src="https://www.youtube.com/embed/m3kR2KK8TEs?autoplay=1&mute=1&rel=0&modestbranding=1&controls=1"
-                title="Artemis II NASA Livestream"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen
-                loading="lazy"
-              ></iframe>
-            </div>
-          </section>
-
-          <!-- Telemetry readouts -->
-          <section class="telem-section" aria-label="Live telemetry" role="status" aria-live="polite">
-            <h2 class="panel-label" data-i18n="sidebar.telemetry">TELEMETRY</h2>
-            <div class="telem-grid">
-              <div class="telem-item">
-                <span class="telem-item__label" data-i18n="sidebar.speed">Speed</span>
-                <span class="telem-item__value" id="tel-speed">—</span>
-                <span class="telem-item__unit">km/s</span>
-              </div>
-              <div class="telem-item">
-                <span class="telem-item__label" data-i18n="sidebar.distance">Distance</span>
-                <span class="telem-item__value" id="tel-distance">—</span>
-                <span class="telem-item__unit">km</span>
-              </div>
-              <div class="telem-item">
-                <span class="telem-item__label" id="tel-altitude-label" data-i18n="sidebar.altitude">Altitude</span>
-                <span class="telem-item__value" id="tel-altitude">—</span>
-                <span class="telem-item__unit">km <span id="tel-altitude-body"></span></span>
-              </div>
-              <div class="telem-item telem-item--wide">
-                <span class="telem-item__label" id="mission-hud-sub-label">T+LAUNCH</span>
-                <span class="telem-item__value telem-item__value--mono" id="mission-hud-sub-value">—</span>
-              </div>
-            </div>
-          </section>
-
-          <!-- Velocity chart -->
-          <section class="chart-section">
-            <h2 class="panel-label"><span data-i18n="sidebar.velocity">Velocity</span>  <span class="panel-label__unit">km/s</span></h2>
-            <div class="chart-wrap">
-              <canvas id="chart-speed" aria-label="Spacecraft speed over mission time"></canvas>
-            </div>
-          </section>
-
-          <!-- Distance chart -->
-          <section class="chart-section">
-            <h2 class="panel-label"><span data-i18n="sidebar.distChart">Distance from Earth</span>  <span class="panel-label__unit">×1000 km</span></h2>
-            <div class="chart-wrap">
-              <canvas id="chart-distance" aria-label="Distance from Earth over mission time"></canvas>
-            </div>
-          </section>
-
-          <!-- Altitude chart -->
-          <section class="chart-section">
-            <h2 class="panel-label"><span data-i18n="sidebar.altChart">Altitude</span>  <span class="panel-label__unit">×1000 km</span></h2>
-            <div class="chart-wrap">
-              <canvas id="chart-altitude" aria-label="Altitude above SOI body over mission time"></canvas>
-            </div>
-          </section>
-
-          <!-- Mission timeline (scrollable) -->
+        <!-- ─── Left timeline panel ─── -->
+        <aside class="timeline-panel" aria-label="Mission timeline">
           <section class="timeline-section">
             <h2 class="panel-label">
               <span data-i18n="sidebar.timeline">Mission Timeline</span>
@@ -340,8 +237,236 @@
               </ol><!-- .timeline -->
             </div><!-- .timeline-scroll -->
           </section><!-- .timeline-section -->
+        </aside><!-- .timeline-panel -->
+
+        <!-- ─── Timeline resize gutter ─── -->
+        <div class="timeline-resize-gutter" id="timeline-resize-gutter" aria-hidden="true"></div>
+
+        <!-- 3D orbit view -->
+        <div class="orbit-panel" id="orbit-wrap" aria-label="3D spacecraft trajectory">
+          <canvas id="orbit-canvas"></canvas>
+          <!-- Camera controls toolbar -->
+          <div class="orbit-controls-toolbar">
+            <!-- Navigation -->
+            <button type="button" class="orbit-ctrl-btn" id="orbit-craft-focus" title="Focus spacecraft">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
+              </svg>
+            </button>
+            <button type="button" class="orbit-ctrl-btn" id="orbit-reset" title="Reset view">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M3 3v5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button type="button" class="orbit-ctrl-btn orbit-ctrl-btn--toggle" id="orbit-autorotate" title="Auto-rotate" data-active="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-9-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M21 3v6h-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="orbit-ctrl-btn-divider"></div>
+            <!-- Visibility -->
+            <button type="button" class="orbit-ctrl-btn orbit-ctrl-btn--toggle" id="orbit-toggle-labels" title="Toggle labels" data-active="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="2" y="7" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M16 10.5l2.5-2.5 2.5 2.5M18.5 8v7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button type="button" class="orbit-ctrl-btn orbit-ctrl-btn--toggle" id="orbit-toggle-markers" title="Toggle markers" data-active="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+              </svg>
+            </button>
+            <div class="orbit-ctrl-btn-divider"></div>
+            <!-- Fullscreen -->
+            <button type="button" class="orbit-ctrl-btn" id="orbit-fullscreen" title="Fullscreen">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          <!-- Live visitor counter -->
+          <div class="visitor-counter" id="visitor-counter" aria-live="polite">
+            <span class="visitor-counter__dot"></span>
+            <span class="visitor-counter__num" id="visitor-count">—</span>
+            <span class="visitor-counter__label">LIVE</span>
+          </div>
+          <!-- Phase overlay on orbit view -->
+          <div class="orbit-phase-overlay" id="orbit-phase-overlay" aria-hidden="true">
+            <span class="orbit-phase-label" id="orbit-phase-label">—</span>
+          </div>
+        </div>
+
+        <!-- ─── Resize gutter ─── -->
+        <div class="resize-gutter" id="resize-gutter" aria-hidden="true"></div>
+
+        <!-- ─── Side panel ─── -->
+        <aside class="side-panel" role="complementary" aria-label="Mission data">
+
+          <!-- Live stream (always-on, muted autoplay) -->
+          <section class="stream-section" aria-label="NASA live broadcast">
+            <h2 class="panel-label">
+              <span data-i18n="sidebar.live">LIVE COVERAGE</span>
+              <span class="panel-label__sub live-dot-label" aria-hidden="true">● <span data-i18n="sidebar.nasaTv">NASA TV</span></span>
+            </h2>
+            <div class="stream-wrap">
+              <iframe
+                src="https://www.youtube.com/embed/m3kR2KK8TEs?autoplay=1&mute=1&rel=0&modestbranding=1&controls=1"
+                title="Artemis II NASA Livestream"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+                loading="lazy"
+              ></iframe>
+            </div>
+          </section>
+
+          <!-- Telemetry readouts -->
+          <section class="telem-section" aria-label="Live telemetry" role="status" aria-live="polite">
+            <h2 class="panel-label" data-i18n="sidebar.telemetry">TELEMETRY</h2>
+            <div class="telem-grid">
+              <div class="telem-item">
+                <span class="telem-item__label">
+                  <span data-i18n="sidebar.speed">Speed</span>
+                  <span class="telem-tip" data-tip="Spacecraft velocity magnitude relative to Earth's center">?</span>
+                </span>
+                <span class="telem-item__reading">
+                  <span class="telem-item__value" id="tel-speed">—</span>
+                  <span class="telem-item__unit">km/s</span>
+                </span>
+              </div>
+              <div class="telem-item">
+                <span class="telem-item__label">
+                  <span data-i18n="sidebar.distance">Dist. Earth</span>
+                  <span class="telem-tip" data-tip="Distance from Earth's center of mass">?</span>
+                </span>
+                <span class="telem-item__reading">
+                  <span class="telem-item__value" id="tel-distance">—</span>
+                  <span class="telem-item__unit">km</span>
+                </span>
+              </div>
+              <div class="telem-item">
+                <span class="telem-item__label">
+                  <span id="tel-altitude-label" data-i18n="sidebar.altitude">Altitude</span>
+                  <span class="telem-tip" data-tip="Height above the surface of the current SOI body (Earth or Moon)">?</span>
+                </span>
+                <span class="telem-item__reading">
+                  <span class="telem-item__value" id="tel-altitude">—</span>
+                  <span class="telem-item__unit">km <span id="tel-altitude-body"></span></span>
+                </span>
+              </div>
+              <div class="telem-item">
+                <span class="telem-item__label">
+                  Dist. Moon
+                  <span class="telem-tip" data-tip="Distance from the Moon's center of mass">?</span>
+                </span>
+                <span class="telem-item__reading">
+                  <span class="telem-item__value" id="tel-dist-moon">—</span>
+                  <span class="telem-item__unit">km</span>
+                </span>
+              </div>
+              <div class="telem-item telem-item--wide">
+                <span class="telem-item__label">
+                  <span id="mission-hud-sub-label">T+LAUNCH</span>
+                  <span class="telem-tip" data-tip="Pre-launch: countdown to liftoff · In-flight: time to splashdown · Post-mission: mission duration">?</span>
+                </span>
+                <span class="telem-item__reading">
+                  <span class="telem-item__value telem-item__value--mono" id="mission-hud-sub-value">—</span>
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Velocity chart -->
+          <section class="chart-section">
+            <h2 class="panel-label">
+              <span class="panel-label__left"><span data-i18n="sidebar.velocity">Velocity</span><span class="telem-tip" data-tip="Spacecraft speed magnitude (km/s). Peaks at TLI burn, drops near lunar close approach.">?</span></span>
+              <span class="panel-label__unit">km/s</span>
+            </h2>
+            <div class="chart-wrap">
+              <canvas id="chart-speed" aria-label="Spacecraft speed over mission time"></canvas>
+            </div>
+          </section>
+
+          <!-- Distance chart -->
+          <section class="chart-section">
+            <h2 class="panel-label">
+              <span class="panel-label__left"><span data-i18n="sidebar.distChart">Distance from Earth</span><span class="telem-tip" data-tip="Distance from Earth's center of mass. Peaks at ~413,000 km near lunar flyby.">?</span></span>
+              <span class="panel-label__unit">×1000 km</span>
+            </h2>
+            <div class="chart-wrap">
+              <canvas id="chart-distance" aria-label="Distance from Earth over mission time"></canvas>
+            </div>
+          </section>
+
+          <!-- Altitude chart -->
+          <section class="chart-section">
+            <h2 class="panel-label">
+              <span class="panel-label__left"><span data-i18n="sidebar.altChart">Altitude</span><span class="telem-tip" data-tip="Height above the surface of the dominant SOI body. Blue = Earth SOI, grey = Moon SOI.">?</span></span>
+              <span class="panel-label__unit">×1000 km</span>
+            </h2>
+            <div class="chart-wrap">
+              <canvas id="chart-altitude" aria-label="Altitude above SOI body over mission time"></canvas>
+            </div>
+          </section>
+
+          <!-- Distance from Moon chart -->
+          <section class="chart-section">
+            <h2 class="panel-label">
+              <span class="panel-label__left">Dist. Moon<span class="telem-tip" data-tip="Distance from the Moon's center. The sharp dip around MET 120h shows the lunar close approach.">?</span></span>
+              <span class="panel-label__unit">×1000 km</span>
+            </h2>
+            <div class="chart-wrap">
+              <canvas id="chart-moon-distance" aria-label="Distance from Moon over mission time"></canvas>
+            </div>
+          </section>
+
+          <!-- Radial velocity chart -->
+          <section class="chart-section chart-section--last">
+            <h2 class="panel-label">
+              <span class="panel-label__left">Radial Velocity<span class="telem-tip" data-tip="Rate at which distance from Earth changes. Green = moving away, red = returning. Crosses zero at maximum distance.">?</span></span>
+              <span class="panel-label__unit">km/s</span>
+            </h2>
+            <div class="chart-wrap">
+              <canvas id="chart-radial-rate" aria-label="Opening/closing speed relative to Earth over mission time"></canvas>
+            </div>
+          </section>
 
         </aside><!-- .side-panel -->
+
+        </div><!-- .mobile-content-area -->
+
+        <!-- ─── Mobile tab bar (hidden on desktop) ─── -->
+        <nav class="mobile-tabs" id="mobile-tabs" aria-label="View switcher">
+          <button class="mobile-tab mobile-tab--active" data-tab="orbit" aria-pressed="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1" stroke-dasharray="3 2"/>
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>ORBIT</span>
+          </button>
+          <button class="mobile-tab" data-tab="data" aria-pressed="false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>DATA</span>
+          </button>
+          <button class="mobile-tab" data-tab="mission" aria-pressed="false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <line x1="8" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="8" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="8" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="3.5" cy="6" r="1.5" fill="currentColor"/>
+              <circle cx="3.5" cy="12" r="1.5" fill="currentColor"/>
+              <circle cx="3.5" cy="18" r="1.5" fill="currentColor"/>
+            </svg>
+            <span>MISSION</span>
+          </button>
+        </nav>
       </div><!-- .main-content -->
 
       <!-- ─── Status bar ─── -->
@@ -466,6 +591,9 @@
 
     <!-- Hidden legacy IDs kept for main.ts compatibility -->
     <span hidden id="telemetry-met" aria-hidden="true"></span>
+
+    <!-- Global tooltip popup (avoids overflow clipping from side-panel) -->
+    <div class="tip-popup" id="tip-popup" aria-hidden="true"></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
