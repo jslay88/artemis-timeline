@@ -101,8 +101,9 @@ initI18n();
       menu.style.right = `${window.innerWidth - r.right}px`;
     }
 
-    // Stop pointer events inside menu from bubbling to the document close handler
+    // Stop pointer events inside menu and button from bubbling to document close handler
     menu.addEventListener("pointerdown", (e) => e.stopPropagation());
+    btn.addEventListener("pointerdown", (e) => e.stopPropagation());
 
     // Toggle open/close
     btn.addEventListener("click", (e) => {

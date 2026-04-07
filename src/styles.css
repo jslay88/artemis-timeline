@@ -1327,11 +1327,14 @@ html, body {
     gap: 6px;
   }
   .locale-picker__btn {
-    font-size: 12px;
-    min-height: 36px;
-    padding: 6px 12px 6px 10px;
+    font-size: 11px;
+    min-height: 30px;
+    padding: 4px 9px 4px 7px;
     border-radius: 20px;
+    gap: 4px;
   }
+  .locale-picker__flag { font-size: 12px; }
+  .locale-picker__chevron { width: 9px; height: 9px; }
   .locale-picker__option {
     padding: 11px 14px;
     font-size: 13px;
