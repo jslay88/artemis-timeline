@@ -504,54 +504,35 @@ function updateOrbitOffsets(live: arow.ArowOrbit, _currentUtcMs: number): void {
 }
 
 /* ══════════════════════════════════════════════
-   Odometer gauge — 60fps smooth number animation
-   Each digit sits in a clipped column of 0-9. CSS transitions
-   slide the column when a digit changes, giving a mechanical
-   odometer effect. The 4 Hz data loop sets targets; a rAF loop
-   lerps the underlying value for steady tick cadence.
+   Rolling gauge display — 60fps smooth number animation
+   The 4 Hz data loop sets target values; a rAF loop lerps
+   the displayed numbers toward them for steady ticking.
    ══════════════════════════════════════════════ */
-const ODO_H = 1.1; // em — matches telem-item__value line-height
-
-// Strip layout: [ 9 | 0 1 2 3 4 5 6 7 8 9 | 0 ]   (12 entries)
-// Digit d at rest sits at strip index d+1.
-// Fractional positions slide smoothly between digits.
-// Extra 9 at top / 0 at bottom provide visual continuity at wraps.
-
 class Gauge {
-  private _current = 0;
-  private _target = 0;
+  private _current: number;
+  private _target: number;
   private _el: HTMLElement | null;
   private _format: (v: number) => string;
-  private _decimals: number;
-  private _template = "";
-  private _strips: HTMLElement[] = [];
-  private _displayPos: number[] = [];
-  private _active = false;
+  private _lastText = "";
 
-  constructor(el: HTMLElement | null, format: (v: number) => string, decimals = 0) {
+  constructor(el: HTMLElement | null, format: (v: number) => string, initial = 0) {
     this._el = el;
     this._format = format;
-    this._decimals = decimals;
+    this._current = initial;
+    this._target = initial;
   }
 
   set(target: number): void {
-    if (!this._active) {
-      this._current = target;
-      this._active = true;
-    }
     this._target = target;
   }
 
-  reset(): void {
-    this._active = false;
-    this._template = "";
-    this._strips = [];
-    this._displayPos = [];
-    if (this._el) this._el.textContent = "—";
+  snap(value: number): void {
+    this._current = value;
+    this._target = value;
+    this._render();
   }
 
   tick(alpha: number): void {
-    if (!this._active) return;
     const diff = this._target - this._current;
     if (Math.abs(diff) < 0.001) {
       this._current = this._target;
@@ -564,90 +545,26 @@ class Gauge {
   private _render(): void {
     if (!this._el) return;
     const text = this._format(this._current);
-
-    const tpl = text.replace(/\d/g, "#");
-    if (tpl !== this._template) {
-      this._template = tpl;
-      this._buildOdo(text);
+    if (text !== this._lastText) {
+      this._lastText = text;
+      this._el.textContent = text;
     }
-
-    const absVal = Math.abs(this._current);
-    const n = this._strips.length;
-    for (let i = 0; i < n; i++) {
-      const power = (n - 1 - i) - this._decimals;
-      const fracDigit = (absVal / Math.pow(10, power)) % 10;
-
-      let pos = this._displayPos[i];
-      // Shortest-path delta on the circular 0–10 range
-      let delta = fracDigit - ((pos % 10) + 10) % 10;
-      if (delta > 5) delta -= 10;
-      if (delta < -5) delta += 10;
-      pos += delta;
-
-      // Keep within strip bounds [-0.5, 10.5] by snapping to
-      // the equivalent position (visually identical thanks to
-      // the repeated 9 and 0 at the strip edges)
-      if (pos > 10.5) pos -= 10;
-      if (pos < -0.5) pos += 10;
-
-      this._displayPos[i] = pos;
-      this._strips[i].style.transform = `translateY(${-(pos + 1) * ODO_H}em)`;
-    }
-  }
-
-  private _buildOdo(text: string): void {
-    const el = this._el!;
-    el.textContent = "";
-    this._strips = [];
-    this._displayPos = [];
-
-    const absVal = Math.abs(this._current);
-    const wrap = document.createElement("span");
-    wrap.className = "odo";
-
-    let digitIdx = 0;
-    const digitCount = text.replace(/[^0-9]/g, "").length;
-
-    for (const ch of text) {
-      if (ch >= "0" && ch <= "9") {
-        const power = (digitCount - 1 - digitIdx) - this._decimals;
-        const fracDigit = (absVal / Math.pow(10, power)) % 10;
-
-        const col = document.createElement("span");
-        col.className = "odo__col";
-        const strip = document.createElement("span");
-        strip.className = "odo__strip";
-        strip.style.transform = `translateY(${-(fracDigit + 1) * ODO_H}em)`;
-        for (const digit of [9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0]) {
-          const s = document.createElement("span");
-          s.textContent = String(digit);
-          strip.appendChild(s);
-        }
-        col.appendChild(strip);
-        wrap.appendChild(col);
-        this._strips.push(strip);
-        this._displayPos.push(fracDigit);
-        digitIdx++;
-      } else {
-        const sep = document.createElement("span");
-        sep.className = "odo__sep";
-        sep.textContent = ch;
-        wrap.appendChild(sep);
-      }
-    }
-
-    el.appendChild(wrap);
   }
 }
 
-const gaugeSpeed    = new Gauge(telSpeed,    (v) => Math.max(0, v).toFixed(2), 2);
-const gaugeEarthDist = new Gauge(telDistance, (v) => Math.round(Math.max(0, v)).toLocaleString(), 0);
-const gaugeAltitude = new Gauge(telAltitude, (v) => Math.round(Math.max(0, v)).toLocaleString(), 0);
-const gaugeMoonDist = new Gauge(telDistMoon, (v) => Math.round(Math.max(0, v)).toLocaleString(), 0);
-const gaugeGforce   = new Gauge(telGforce,   (v) => v.toFixed(3), 3);
-const gaugeRoll     = new Gauge(telRoll,     (v) => v.toFixed(1), 1);
-const gaugePitch    = new Gauge(telPitch,    (v) => v.toFixed(1), 1);
-const gaugeYaw      = new Gauge(telYaw,      (v) => v.toFixed(1), 1);
+const fmtSpeed  = (v: number) => Math.max(0, v).toFixed(2);
+const fmtInt    = (v: number) => Math.round(Math.max(0, v)).toLocaleString();
+const fmtDeg    = (v: number) => v.toFixed(1);
+const fmtGforce = (v: number) => v.toFixed(3);
+
+const gaugeSpeed    = new Gauge(telSpeed,    fmtSpeed);
+const gaugeEarthDist = new Gauge(telDistance, fmtInt);
+const gaugeAltitude = new Gauge(telAltitude, fmtInt);
+const gaugeMoonDist = new Gauge(telDistMoon, fmtInt);
+const gaugeGforce   = new Gauge(telGforce,   fmtGforce);
+const gaugeRoll     = new Gauge(telRoll,     fmtDeg);
+const gaugePitch    = new Gauge(telPitch,    fmtDeg);
+const gaugeYaw      = new Gauge(telYaw,      fmtDeg);
 
 const GAUGE_ALPHA = 0.12;
 
@@ -724,8 +641,8 @@ function updateDashboard() {
 
   if (liveOrbit) {
     gaugeGforce.set(liveOrbit.gForce);
-  } else {
-    gaugeGforce.reset();
+  } else if (telGforce) {
+    telGforce.textContent = "—";
   }
 
   const altBody = document.getElementById("tel-altitude-body");
@@ -738,9 +655,9 @@ function updateDashboard() {
     gaugePitch.set(att.eulerDeg.pitch);
     gaugeYaw.set(att.eulerDeg.yaw);
   } else {
-    gaugeRoll.reset();
-    gaugePitch.reset();
-    gaugeYaw.reset();
+    if (telRoll)  telRoll.textContent  = "—";
+    if (telPitch) telPitch.textContent = "—";
+    if (telYaw)   telYaw.textContent   = "—";
   }
 
   // ── AROW DSN ──
