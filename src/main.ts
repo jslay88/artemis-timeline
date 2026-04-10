@@ -511,26 +511,27 @@ function updateOrbitOffsets(live: arow.ArowOrbit, _currentUtcMs: number): void {
    lerps the underlying value for steady tick cadence.
    ══════════════════════════════════════════════ */
 const ODO_H = 1.1; // em — matches telem-item__value line-height
-// Strip layout: [ 9 | 0 1 2 3 4 5 6 7 8 9 | 0 ]
-// Index:          0   1 2 3 4 5 6 7 8 9 10  11
-// Digit d sits at index d+1. Extra 9 at top and 0 at bottom allow
-// wrapping in either direction without reversing.
-const ODO_OFFSET = 1; // digit d → index d + ODO_OFFSET
+
+// Strip layout: [ 9 | 0 1 2 3 4 5 6 7 8 9 | 0 ]   (12 entries)
+// Digit d at rest sits at strip index d+1.
+// Fractional positions slide smoothly between digits.
+// Extra 9 at top / 0 at bottom provide visual continuity at wraps.
 
 class Gauge {
   private _current = 0;
   private _target = 0;
   private _el: HTMLElement | null;
   private _format: (v: number) => string;
-  private _lastText = "";
+  private _decimals: number;
   private _template = "";
   private _strips: HTMLElement[] = [];
-  private _lastDigits: number[] = [];
+  private _displayPos: number[] = [];
   private _active = false;
 
-  constructor(el: HTMLElement | null, format: (v: number) => string) {
+  constructor(el: HTMLElement | null, format: (v: number) => string, decimals = 0) {
     this._el = el;
     this._format = format;
+    this._decimals = decimals;
   }
 
   set(target: number): void {
@@ -545,8 +546,7 @@ class Gauge {
     this._active = false;
     this._template = "";
     this._strips = [];
-    this._lastDigits = [];
-    this._lastText = "";
+    this._displayPos = [];
     if (this._el) this._el.textContent = "—";
   }
 
@@ -564,85 +564,60 @@ class Gauge {
   private _render(): void {
     if (!this._el) return;
     const text = this._format(this._current);
-    if (text === this._lastText) return;
-    this._lastText = text;
 
     const tpl = text.replace(/\d/g, "#");
     if (tpl !== this._template) {
       this._template = tpl;
       this._buildOdo(text);
-      return;
     }
 
-    let si = 0;
-    for (const ch of text) {
-      if (ch >= "0" && ch <= "9") {
-        const d = parseInt(ch);
-        if (d !== this._lastDigits[si]) {
-          const prev = this._lastDigits[si];
-          this._lastDigits[si] = d;
-          this._animateDigit(si, prev, d);
-        }
-        si++;
-      }
+    const absVal = Math.abs(this._current);
+    const n = this._strips.length;
+    for (let i = 0; i < n; i++) {
+      const power = (n - 1 - i) - this._decimals;
+      const fracDigit = (absVal / Math.pow(10, power)) % 10;
+
+      let pos = this._displayPos[i];
+      // Shortest-path delta on the circular 0–10 range
+      let delta = fracDigit - ((pos % 10) + 10) % 10;
+      if (delta > 5) delta -= 10;
+      if (delta < -5) delta += 10;
+      pos += delta;
+
+      // Keep within strip bounds [-0.5, 10.5] by snapping to
+      // the equivalent position (visually identical thanks to
+      // the repeated 9 and 0 at the strip edges)
+      if (pos > 10.5) pos -= 10;
+      if (pos < -0.5) pos += 10;
+
+      this._displayPos[i] = pos;
+      this._strips[i].style.transform = `translateY(${-(pos + 1) * ODO_H}em)`;
     }
-  }
-
-  private _animateDigit(si: number, from: number, to: number): void {
-    const strip = this._strips[si];
-    const forward = (to - from + 10) % 10 <= 5;
-
-    if (from === 9 && to === 0) {
-      // 9→0 wrapping forward: animate to the extra 0 at index 11
-      strip.style.transform = `translateY(${-11 * ODO_H}em)`;
-      this._snapAfterTransition(strip, to);
-    } else if (from === 0 && to === 9) {
-      // 0→9 wrapping backward: animate to the extra 9 at index 0
-      strip.style.transform = `translateY(${0}em)`;
-      this._snapAfterTransition(strip, to);
-    } else if (forward && from > to) {
-      // e.g. 8→1: wraps through 0, animate to 11 + to
-      strip.style.transform = `translateY(${-(11 + to) * ODO_H}em)`;
-      this._snapAfterTransition(strip, to);
-    } else if (!forward && from < to) {
-      // e.g. 1→8: wraps backward through 0, animate to -(to - 10)
-      strip.style.transform = `translateY(${-(to - 10 + ODO_OFFSET) * ODO_H}em)`;
-      this._snapAfterTransition(strip, to);
-    } else {
-      strip.style.transform = `translateY(${-(to + ODO_OFFSET) * ODO_H}em)`;
-    }
-  }
-
-  private _snapAfterTransition(strip: HTMLElement, digit: number): void {
-    const handler = () => {
-      strip.removeEventListener("transitionend", handler);
-      strip.style.transition = "none";
-      strip.style.transform = `translateY(${-(digit + ODO_OFFSET) * ODO_H}em)`;
-      // Force reflow then restore transition
-      strip.offsetHeight;
-      strip.style.transition = "";
-    };
-    strip.addEventListener("transitionend", handler, { once: true });
   }
 
   private _buildOdo(text: string): void {
     const el = this._el!;
     el.textContent = "";
     this._strips = [];
-    this._lastDigits = [];
+    this._displayPos = [];
 
+    const absVal = Math.abs(this._current);
     const wrap = document.createElement("span");
     wrap.className = "odo";
 
+    let digitIdx = 0;
+    const digitCount = text.replace(/[^0-9]/g, "").length;
+
     for (const ch of text) {
       if (ch >= "0" && ch <= "9") {
-        const d = parseInt(ch);
+        const power = (digitCount - 1 - digitIdx) - this._decimals;
+        const fracDigit = (absVal / Math.pow(10, power)) % 10;
+
         const col = document.createElement("span");
         col.className = "odo__col";
         const strip = document.createElement("span");
         strip.className = "odo__strip";
-        strip.style.transform = `translateY(${-(d + ODO_OFFSET) * ODO_H}em)`;
-        // Layout: 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0
+        strip.style.transform = `translateY(${-(fracDigit + 1) * ODO_H}em)`;
         for (const digit of [9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0]) {
           const s = document.createElement("span");
           s.textContent = String(digit);
@@ -651,7 +626,8 @@ class Gauge {
         col.appendChild(strip);
         wrap.appendChild(col);
         this._strips.push(strip);
-        this._lastDigits.push(d);
+        this._displayPos.push(fracDigit);
+        digitIdx++;
       } else {
         const sep = document.createElement("span");
         sep.className = "odo__sep";
@@ -664,19 +640,14 @@ class Gauge {
   }
 }
 
-const fmtSpeed  = (v: number) => Math.max(0, v).toFixed(2);
-const fmtInt    = (v: number) => Math.round(Math.max(0, v)).toLocaleString();
-const fmtDeg    = (v: number) => v.toFixed(1);
-const fmtGforce = (v: number) => v.toFixed(3);
-
-const gaugeSpeed    = new Gauge(telSpeed,    fmtSpeed);
-const gaugeEarthDist = new Gauge(telDistance, fmtInt);
-const gaugeAltitude = new Gauge(telAltitude, fmtInt);
-const gaugeMoonDist = new Gauge(telDistMoon, fmtInt);
-const gaugeGforce   = new Gauge(telGforce,   fmtGforce);
-const gaugeRoll     = new Gauge(telRoll,     fmtDeg);
-const gaugePitch    = new Gauge(telPitch,    fmtDeg);
-const gaugeYaw      = new Gauge(telYaw,      fmtDeg);
+const gaugeSpeed    = new Gauge(telSpeed,    (v) => Math.max(0, v).toFixed(2), 2);
+const gaugeEarthDist = new Gauge(telDistance, (v) => Math.round(Math.max(0, v)).toLocaleString(), 0);
+const gaugeAltitude = new Gauge(telAltitude, (v) => Math.round(Math.max(0, v)).toLocaleString(), 0);
+const gaugeMoonDist = new Gauge(telDistMoon, (v) => Math.round(Math.max(0, v)).toLocaleString(), 0);
+const gaugeGforce   = new Gauge(telGforce,   (v) => v.toFixed(3), 3);
+const gaugeRoll     = new Gauge(telRoll,     (v) => v.toFixed(1), 1);
+const gaugePitch    = new Gauge(telPitch,    (v) => v.toFixed(1), 1);
+const gaugeYaw      = new Gauge(telYaw,      (v) => v.toFixed(1), 1);
 
 const GAUGE_ALPHA = 0.12;
 
