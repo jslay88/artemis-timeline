@@ -1,8 +1,8 @@
 // arow.ts — Live AROW telemetry from the artemis.cdnspace.ca community relay.
-// Connects via SSE to /api/telemetry/stream and stores the latest snapshot of
-// each event type with a receive timestamp for freshness checks.
+// Uses REST polling through a CORS proxy. Each endpoint is polled at its
+// natural cadence: attitude 2s, DSN 15s, orbit 30s, solar 120s.
 
-const API_BASE = "https://artemis.cdnspace.ca";
+const PROXY_BASE = import.meta.env.VITE_AROW_PROXY ?? "https://artemis-arow-proxy.jslay88.workers.dev";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -73,8 +73,8 @@ interface Stamped<T> {
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
-let _es: EventSource | null = null;
 let _connected = false;
+let _timers: ReturnType<typeof setInterval>[] = [];
 
 let _orbit: Stamped<ArowOrbit> | null = null;
 let _stateVector: Stamped<ArowStateVector> | null = null;
@@ -82,6 +82,9 @@ let _moonPosition: Stamped<{ x: number; y: number; z: number }> | null = null;
 let _attitude: Stamped<ArowAttitude> | null = null;
 let _dsn: Stamped<ArowDsn> | null = null;
 let _solar: Stamped<ArowSolar> | null = null;
+
+let _lastSuccess = 0;
+const CONNECTED_WINDOW_MS = 30_000;
 
 // ─── Freshness helpers ──────────────────────────────────────────────────────
 
@@ -119,75 +122,86 @@ export function isConnected(): boolean {
   return _connected;
 }
 
-// ─── SSE Connection ─────────────────────────────────────────────────────────
+// ─── Fetch helpers ──────────────────────────────────────────────────────────
+
+async function fetchJson<T>(path: string): Promise<T | null> {
+  try {
+    const resp = await fetch(`${PROXY_BASE}${path}`);
+    if (!resp.ok) return null;
+    _lastSuccess = Date.now();
+    _connected = true;
+    return await resp.json() as T;
+  } catch {
+    if (Date.now() - _lastSuccess > CONNECTED_WINDOW_MS) _connected = false;
+    return null;
+  }
+}
+
+// ─── Pollers ────────────────────────────────────────────────────────────────
+
+async function pollArow(): Promise<void> {
+  const d = await fetchJson<Record<string, unknown>>("/api/arow");
+  if (!d) return;
+  _attitude = {
+    data: {
+      quaternion: (d.quaternion as ArowAttitude["quaternion"]) ?? { w: 0, x: 0, y: 0, z: 0 },
+      eulerDeg: (d.eulerDeg as ArowAttitude["eulerDeg"]) ?? { roll: 0, pitch: 0, yaw: 0 },
+      rollRate: (d.rollRate as number) ?? 0,
+      pitchRate: (d.pitchRate as number) ?? 0,
+      yawRate: (d.yawRate as number) ?? 0,
+      sawAngles: (d.sawAngles as ArowAttitude["sawAngles"]) ?? { saw1: 0, saw2: 0, saw3: 0, saw4: 0 },
+      spacecraftMode: (d.spacecraftMode as string) ?? "",
+    },
+    receivedAt: Date.now(),
+  };
+}
+
+async function pollOrbit(): Promise<void> {
+  const d = await fetchJson<ArowOrbit>("/api/orbit");
+  if (d) _orbit = { data: d, receivedAt: Date.now() };
+}
+
+async function pollState(): Promise<void> {
+  const d = await fetchJson<{ stateVector: ArowStateVector; moonPosition: { x: number; y: number; z: number } }>("/api/state");
+  if (!d) return;
+  const now = Date.now();
+  if (d.stateVector) _stateVector = { data: d.stateVector, receivedAt: now };
+  if (d.moonPosition) _moonPosition = { data: d.moonPosition, receivedAt: now };
+}
+
+async function pollDsn(): Promise<void> {
+  const d = await fetchJson<ArowDsn>("/api/dsn");
+  if (d) _dsn = { data: d, receivedAt: Date.now() };
+}
+
+async function pollSolar(): Promise<void> {
+  const d = await fetchJson<ArowSolar>("/api/solar");
+  if (d) _solar = { data: d, receivedAt: Date.now() };
+}
+
+// ─── Lifecycle ──────────────────────────────────────────────────────────────
 
 export function connect(): void {
-  if (_es) return;
+  if (_timers.length > 0) return;
 
-  _es = new EventSource(`${API_BASE}/api/telemetry/stream`);
+  // Fire all immediately, then at their natural cadences
+  pollArow();
+  pollOrbit();
+  pollState();
+  pollDsn();
+  pollSolar();
 
-  _es.addEventListener("open", () => {
-    _connected = true;
-  });
-
-  _es.addEventListener("error", () => {
-    _connected = false;
-  });
-
-  _es.addEventListener("telemetry", (e: MessageEvent) => {
-    try {
-      const d = JSON.parse(e.data);
-      const now = Date.now();
-
-      if (d.telemetry) {
-        _orbit = { data: d.telemetry as ArowOrbit, receivedAt: now };
-      }
-      if (d.stateVector) {
-        _stateVector = { data: d.stateVector as ArowStateVector, receivedAt: now };
-      }
-      if (d.moonPosition) {
-        _moonPosition = { data: d.moonPosition, receivedAt: now };
-      }
-    } catch { /* malformed JSON — skip */ }
-  });
-
-  _es.addEventListener("arow", (e: MessageEvent) => {
-    try {
-      const d = JSON.parse(e.data);
-      _attitude = {
-        data: {
-          quaternion: d.quaternion ?? { w: 0, x: 0, y: 0, z: 0 },
-          eulerDeg: d.eulerDeg ?? { roll: 0, pitch: 0, yaw: 0 },
-          rollRate: d.rollRate ?? 0,
-          pitchRate: d.pitchRate ?? 0,
-          yawRate: d.yawRate ?? 0,
-          sawAngles: d.sawAngles ?? { saw1: 0, saw2: 0, saw3: 0, saw4: 0 },
-          spacecraftMode: d.spacecraftMode ?? "",
-        },
-        receivedAt: Date.now(),
-      };
-    } catch { /* skip */ }
-  });
-
-  _es.addEventListener("dsn", (e: MessageEvent) => {
-    try {
-      const d = JSON.parse(e.data);
-      _dsn = { data: d as ArowDsn, receivedAt: Date.now() };
-    } catch { /* skip */ }
-  });
-
-  _es.addEventListener("solar", (e: MessageEvent) => {
-    try {
-      const d = JSON.parse(e.data);
-      _solar = { data: d as ArowSolar, receivedAt: Date.now() };
-    } catch { /* skip */ }
-  });
+  _timers.push(
+    setInterval(pollArow,   2_000),   // attitude — 2s (upstream is 1s)
+    setInterval(pollOrbit, 30_000),   // orbital  — 30s (upstream is 5 min)
+    setInterval(pollState, 30_000),   // state vectors — 30s
+    setInterval(pollDsn,   15_000),   // DSN — 15s (upstream is 10s)
+    setInterval(pollSolar, 120_000),  // solar — 2 min (upstream is 60s)
+  );
 }
 
 export function disconnect(): void {
-  if (_es) {
-    _es.close();
-    _es = null;
-    _connected = false;
-  }
+  for (const t of _timers) clearInterval(t);
+  _timers = [];
+  _connected = false;
 }

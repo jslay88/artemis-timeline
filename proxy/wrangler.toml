@@ -1,0 +1,7 @@
+name = "artemis-arow-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[vars]
+UPSTREAM = "https://artemis.cdnspace.ca"
+ALLOWED_ORIGIN = "https://jslay88.github.io"
