@@ -306,8 +306,13 @@ function createStarSkybox(base: string, renderer: THREE.WebGLRenderer, mgr?: THR
    Main Scene
    ════════════════════════════════════════════ */
 
+export interface LiveAttitude {
+  quaternion: { w: number; x: number; y: number; z: number };
+}
+
 export interface OrbitClock {
   getProgress: () => number;
+  getAttitude?: () => LiveAttitude | null;
 }
 
 export interface OrbitLoadCallbacks {
@@ -676,6 +681,7 @@ export function createOrbitScene(
   scene.add(craft);
   loadOrionModel(craft, base, loadMgr);
   const craftForward = new THREE.Vector3(0, 0, -1);
+  const _emeQuat = new THREE.Quaternion();
   const trail = createTrailSystem(scene);
 
   /* Depth mask — invisible sphere that punches a gap in the tube at spacecraft position */
@@ -996,7 +1002,17 @@ export function createOrbitScene(
     else tangent.normalize();
 
     craft.position.copy(pos);
-    craft.quaternion.setFromUnitVectors(craftForward, tangent);
+
+    const liveAtt = clock.getAttitude?.();
+    if (liveAtt) {
+      // AROW quaternion is EME2000 body frame.
+      // EME2000 -> Three.js: x' = x, y' = z, z' = -y
+      const q = liveAtt.quaternion;
+      _emeQuat.set(q.x, q.z, -q.y, q.w).normalize();
+      craft.quaternion.copy(_emeQuat);
+    } else {
+      craft.quaternion.setFromUnitVectors(craftForward, tangent);
+    }
 
     /* Depth mask + craft point light */
     posMask.position.copy(pos);

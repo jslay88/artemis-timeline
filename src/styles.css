@@ -705,6 +705,105 @@ html, body {
   letter-spacing: 0.06em;
 }
 
+/* AROW connection badge */
+.arow-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+  text-transform: uppercase;
+}
+.arow-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-4);
+  flex-shrink: 0;
+}
+.arow-badge--live .arow-badge__dot {
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: blink 1.6s ease infinite;
+}
+.arow-badge--live .arow-badge__label { color: var(--green); }
+
+/* Attitude / secondary telem grid */
+.telem-grid--secondary {
+  grid-template-columns: repeat(4, 1fr);
+}
+@container side (max-width: 420px) {
+  .telem-grid--secondary { grid-template-columns: repeat(4, 1fr); }
+}
+@container side (max-width: 280px) {
+  .telem-grid--secondary { grid-template-columns: repeat(2, 1fr); }
+}
+.telem-grid--secondary .telem-item__value {
+  font-size: clamp(12px, 3cqi, 15px);
+}
+
+/* DSN tracking strip */
+.dsn-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-2);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.dsn-strip__signal {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.dsn-strip__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-4);
+  flex-shrink: 0;
+}
+.dsn-strip__dot--active {
+  background: var(--green);
+  box-shadow: 0 0 5px var(--green);
+}
+.dsn-strip__dot--los {
+  background: var(--accent);
+  box-shadow: 0 0 5px var(--accent);
+}
+.dsn-strip__label { font-weight: 600; font-size: 9px; letter-spacing: 0.08em; }
+.dsn-strip__item { display: inline-flex; align-items: baseline; gap: 3px; }
+.dsn-strip__key { color: var(--text-3); font-size: 8px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.dsn-strip__unit { color: var(--text-3); font-size: 8px; }
+
+/* Solar weather strip */
+.solar-strip {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-2);
+}
+.solar-strip__item { display: inline-flex; align-items: baseline; gap: 4px; }
+.solar-strip__key { color: var(--text-3); font-size: 8px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.solar-strip__risk { font-weight: 600; }
+.solar-strip__risk[data-level="low"] { color: var(--green); }
+.solar-strip__risk[data-level="moderate"] { color: #fbbf24; }
+.solar-strip__risk[data-level="high"] { color: var(--accent); }
+.solar-strip__risk[data-level="severe"] { color: #ef4444; }
+
 /* Live stream */
 .stream-section { border-bottom: 1px solid var(--border); flex-shrink: 0; }
 

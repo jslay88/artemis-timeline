@@ -326,7 +326,10 @@
 
           <!-- Telemetry readouts -->
           <section class="telem-section" aria-label="Live telemetry" role="status" aria-live="polite">
-            <h2 class="panel-label" data-i18n="sidebar.telemetry">TELEMETRY</h2>
+            <h2 class="panel-label">
+              <span data-i18n="sidebar.telemetry">TELEMETRY</span>
+              <span class="arow-badge" id="arow-status"><span class="arow-badge__dot"></span><span class="arow-badge__label">OFFLINE</span></span>
+            </h2>
             <div class="telem-grid">
               <div class="telem-item">
                 <span class="telem-item__label">
@@ -377,6 +380,53 @@
                   <span class="telem-item__value telem-item__value--mono" id="mission-hud-sub-value">—</span>
                 </span>
               </div>
+            </div>
+            <!-- Attitude + G-force (from AROW live stream) -->
+            <div class="telem-grid telem-grid--secondary" id="arow-attitude-grid">
+              <div class="telem-item">
+                <span class="telem-item__label">Roll</span>
+                <span class="telem-item__reading">
+                  <span class="telem-item__value" id="tel-attitude-roll">—</span>
+                  <span class="telem-item__unit">°</span>
+                </span>
+              </div>
+              <div class="telem-item">
+                <span class="telem-item__label">Pitch</span>
+                <span class="telem-item__reading">
+                  <span class="telem-item__value" id="tel-attitude-pitch">—</span>
+                  <span class="telem-item__unit">°</span>
+                </span>
+              </div>
+              <div class="telem-item">
+                <span class="telem-item__label">Yaw</span>
+                <span class="telem-item__reading">
+                  <span class="telem-item__value" id="tel-attitude-yaw">—</span>
+                  <span class="telem-item__unit">°</span>
+                </span>
+              </div>
+              <div class="telem-item">
+                <span class="telem-item__label">G-Force</span>
+                <span class="telem-item__reading">
+                  <span class="telem-item__value" id="tel-gforce">—</span>
+                  <span class="telem-item__unit">g</span>
+                </span>
+              </div>
+            </div>
+            <!-- DSN tracking status -->
+            <div class="dsn-strip" id="dsn-strip">
+              <div class="dsn-strip__signal">
+                <span class="dsn-strip__dot" id="dsn-signal-dot"></span>
+                <span class="dsn-strip__label" id="dsn-status">NO SIGNAL</span>
+              </div>
+              <span class="dsn-strip__item"><span class="dsn-strip__key">STN</span> <span id="dsn-station">—</span></span>
+              <span class="dsn-strip__item"><span class="dsn-strip__key">RTLT</span> <span id="dsn-rtlt">—</span><span class="dsn-strip__unit">s</span></span>
+              <span class="dsn-strip__item"><span class="dsn-strip__key">DL</span> <span id="dsn-downlink">—</span><span class="dsn-strip__unit">bps</span></span>
+            </div>
+            <!-- Space weather -->
+            <div class="solar-strip" id="solar-strip">
+              <span class="solar-strip__item"><span class="solar-strip__key">Kp</span> <span id="solar-kp">—</span></span>
+              <span class="solar-strip__item"><span class="solar-strip__key">X-ray</span> <span id="solar-xray">—</span></span>
+              <span class="solar-strip__item"><span class="solar-strip__key">Radiation</span> <span class="solar-strip__risk" id="solar-risk">—</span></span>
             </div>
           </section>
 

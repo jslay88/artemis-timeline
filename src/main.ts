@@ -11,11 +11,13 @@ import { createOrbitScene, type OrbitLoadCallbacks } from "./orbit-scene.ts";
 import { initI18n, t, setLocale, getLocale, getLocales, onLocaleChange } from "./i18n.ts";
 import { getTelemetry } from "./ephemeris.ts";
 import { createSpeedChart, createDistanceChart, createAltitudeChart, createMoonDistanceChart, createRadialRateChart, type MissionChart } from "./telemetry-charts.ts";
+import * as arow from "./arow.ts";
 
 /* ══════════════════════════════════════════════
    i18n bootstrap + locale picker
    ══════════════════════════════════════════════ */
 initI18n();
+arow.connect();
 
 {
   const picker = document.getElementById("locale-picker");
@@ -144,6 +146,20 @@ const telDistMoon    = document.getElementById("tel-dist-moon");
 const orbitPhaseLabel = document.getElementById("orbit-phase-label");
 const timelineNow    = document.getElementById("timeline-now");
 const timelineNowLabel = document.getElementById("timeline-now-label");
+
+const arowStatusEl   = document.getElementById("arow-status");
+const telRoll        = document.getElementById("tel-attitude-roll");
+const telPitch       = document.getElementById("tel-attitude-pitch");
+const telYaw         = document.getElementById("tel-attitude-yaw");
+const telGforce      = document.getElementById("tel-gforce");
+const dsnStatusEl    = document.getElementById("dsn-status");
+const dsnSignalDot   = document.getElementById("dsn-signal-dot");
+const dsnStationEl   = document.getElementById("dsn-station");
+const dsnRtltEl      = document.getElementById("dsn-rtlt");
+const dsnDownlinkEl  = document.getElementById("dsn-downlink");
+const solarKpEl      = document.getElementById("solar-kp");
+const solarXrayEl    = document.getElementById("solar-xray");
+const solarRiskEl    = document.getElementById("solar-risk");
 
 const timelineRows = [...document.querySelectorAll<HTMLElement>(".timeline-row")];
 const sortedRows: Array<{ el: HTMLElement; h: number }> = timelineRows
@@ -463,6 +479,12 @@ if (scrollEl) {
   mobileQuery.addEventListener("change", applyMobileLayout);
 }
 
+function formatRate(bps: number): string {
+  if (bps >= 1e6) return (bps / 1e6).toFixed(1) + " M";
+  if (bps >= 1e3) return (bps / 1e3).toFixed(1) + " k";
+  return Math.round(bps).toString();
+}
+
 function updateDashboard() {
   const state = getMissionState();
   const metHours = state.phase === "pre"      ? 0
@@ -495,16 +517,83 @@ function updateDashboard() {
     }
   }
 
-  // ── Telemetry (from real ephemeris data) ──
+  // ── Telemetry -- prefer live AROW during flight, fall back to OEM ──
   const utcMs = LAUNCH.getTime() + metHours * 3600000;
   const tel = getTelemetry(utcMs);
 
-  if (telSpeed)    telSpeed.textContent    = tel.speed.toFixed(2);
-  if (telDistance) telDistance.textContent = Math.round(tel.distanceFromEarth).toLocaleString();
-  if (telAltitude) telAltitude.textContent = Math.round(tel.altitude).toLocaleString();
-  if (telDistMoon) telDistMoon.textContent = Math.round(tel.distanceFromMoon).toLocaleString();
+  const liveOrbit = state.phase === "flight" ? arow.getOrbit() : null;
+  if (liveOrbit) {
+    if (telSpeed)    telSpeed.textContent    = liveOrbit.speedKmS.toFixed(2);
+    if (telDistance) telDistance.textContent = Math.round(liveOrbit.earthDistKm).toLocaleString();
+    if (telAltitude) telAltitude.textContent = Math.round(liveOrbit.altitudeKm).toLocaleString();
+    if (telDistMoon) telDistMoon.textContent = Math.round(liveOrbit.moonDistKm).toLocaleString();
+    if (telGforce)   telGforce.textContent   = liveOrbit.gForce.toFixed(3);
+  } else {
+    if (telSpeed)    telSpeed.textContent    = tel.speed.toFixed(2);
+    if (telDistance) telDistance.textContent = Math.round(tel.distanceFromEarth).toLocaleString();
+    if (telAltitude) telAltitude.textContent = Math.round(tel.altitude).toLocaleString();
+    if (telDistMoon) telDistMoon.textContent = Math.round(tel.distanceFromMoon).toLocaleString();
+    if (telGforce)   telGforce.textContent   = "—";
+  }
+
   const altBody = document.getElementById("tel-altitude-body");
   if (altBody) altBody.textContent = tel.altitudeBody === "moon" ? "☽" : "⊕";
+
+  // ── AROW attitude ──
+  const att = state.phase === "flight" ? arow.getAttitude() : null;
+  if (att) {
+    if (telRoll)  telRoll.textContent  = att.eulerDeg.roll.toFixed(1);
+    if (telPitch) telPitch.textContent = att.eulerDeg.pitch.toFixed(1);
+    if (telYaw)   telYaw.textContent   = att.eulerDeg.yaw.toFixed(1);
+  } else {
+    if (telRoll)  telRoll.textContent  = "—";
+    if (telPitch) telPitch.textContent = "—";
+    if (telYaw)   telYaw.textContent   = "—";
+  }
+
+  // ── AROW DSN ──
+  const dsn = arow.getDsn();
+  if (dsn) {
+    const primary = dsn.dishes[0];
+    if (dsnSignalDot) {
+      dsnSignalDot.className = "dsn-strip__dot" + (dsn.signalActive ? " dsn-strip__dot--active" : " dsn-strip__dot--los");
+    }
+    if (dsnStatusEl) dsnStatusEl.textContent = dsn.signalActive ? "AOS" : "LOS";
+    if (primary) {
+      if (dsnStationEl)  dsnStationEl.textContent  = primary.stationName || primary.station;
+      if (dsnRtltEl)     dsnRtltEl.textContent     = primary.rtltSeconds.toFixed(1);
+      if (dsnDownlinkEl) dsnDownlinkEl.textContent = formatRate(primary.downlinkRate);
+    }
+  } else {
+    if (dsnSignalDot) dsnSignalDot.className = "dsn-strip__dot";
+    if (dsnStatusEl)  dsnStatusEl.textContent  = "NO SIGNAL";
+    if (dsnStationEl) dsnStationEl.textContent = "—";
+    if (dsnRtltEl)    dsnRtltEl.textContent    = "—";
+    if (dsnDownlinkEl) dsnDownlinkEl.textContent = "—";
+  }
+
+  // ── AROW solar ──
+  const solar = arow.getSolar();
+  if (solar) {
+    if (solarKpEl)   solarKpEl.textContent   = solar.kpIndex.toFixed(0);
+    if (solarXrayEl) solarXrayEl.textContent = solar.xrayClass;
+    if (solarRiskEl) {
+      solarRiskEl.textContent = solar.radiationRisk;
+      solarRiskEl.dataset.level = solar.radiationRisk.toLowerCase();
+    }
+  } else {
+    if (solarKpEl)   solarKpEl.textContent   = "—";
+    if (solarXrayEl) solarXrayEl.textContent = "—";
+    if (solarRiskEl) { solarRiskEl.textContent = "—"; delete solarRiskEl.dataset.level; }
+  }
+
+  // ── AROW connection badge ──
+  if (arowStatusEl) {
+    const live = arow.isConnected();
+    arowStatusEl.classList.toggle("arow-badge--live", live);
+    const lbl = arowStatusEl.querySelector(".arow-badge__label");
+    if (lbl) lbl.textContent = live ? "LIVE" : "OFFLINE";
+  }
 
   // ── Orbit phase label ──
   if (orbitPhaseLabel && state.phase === "flight") {
@@ -628,6 +717,7 @@ if (orbitCanvas) {
   try {
     orbitApi = createOrbitScene(orbitCanvas, {
       getProgress: () => getMissionState().progress,
+      getAttitude: () => arow.getAttitude(),
     }, loadCb);
     window.addEventListener("resize", () => orbitApi?.resize());
     fullscreenBtn?.addEventListener("click", () => orbitApi?.toggleFullscreen());
