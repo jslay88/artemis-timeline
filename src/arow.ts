@@ -184,12 +184,12 @@ async function pollSolar(): Promise<void> {
 export function connect(): void {
   if (_timers.length > 0) return;
 
-  // Fire all immediately, then at their natural cadences
+  // Stagger initial requests to avoid a burst of concurrent fetches
   pollArow();
-  pollOrbit();
-  pollState();
-  pollDsn();
-  pollSolar();
+  setTimeout(pollOrbit,  500);
+  setTimeout(pollState, 1000);
+  setTimeout(pollDsn,   1500);
+  setTimeout(pollSolar, 2000);
 
   _timers.push(
     setInterval(pollArow,   2_000),   // attitude — 2s (upstream is 1s)

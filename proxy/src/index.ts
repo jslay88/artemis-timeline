@@ -47,18 +47,30 @@ export default {
       return new Response("Not found", { status: 404, headers: cors });
     }
 
-    const upstream = `${env.UPSTREAM}${path}${url.search}`;
-    const resp = await fetch(upstream, {
-      headers: { "User-Agent": "artemis-arow-proxy/1.0" },
-    });
+    try {
+      const upstream = `${env.UPSTREAM}${path}${url.search}`;
+      const ctrl = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), 8000);
 
-    const headers = new Headers(resp.headers);
-    for (const [k, v] of Object.entries(cors)) headers.set(k, v);
+      const resp = await fetch(upstream, {
+        headers: { "User-Agent": "artemis-arow-proxy/1.0" },
+        signal: ctrl.signal,
+      });
+      clearTimeout(timeout);
 
-    return new Response(resp.body, {
-      status: resp.status,
-      statusText: resp.statusText,
-      headers,
-    });
+      const headers = new Headers(resp.headers);
+      for (const [k, v] of Object.entries(cors)) headers.set(k, v);
+
+      return new Response(resp.body, {
+        status: resp.status,
+        statusText: resp.statusText,
+        headers,
+      });
+    } catch {
+      return new Response(JSON.stringify({ error: "upstream unavailable" }), {
+        status: 502,
+        headers: { "Content-Type": "application/json", ...cors },
+      });
+    }
   },
 };
