@@ -1,8 +1,12 @@
-// arow.ts — Live AROW telemetry from the artemis.cdnspace.ca community relay.
-// Uses REST polling through a CORS proxy. Each endpoint is polled at its
-// natural cadence: attitude 2s, DSN 15s, orbit 30s, solar 120s.
+// arow.ts — Live telemetry from NASA's AROW ground system.
+// Attitude data is fetched directly from NASA's GCS bucket (via our CORS
+// proxy). Computed orbital, DSN, and solar data come from the community
+// relay's /api/all endpoint as a fallback source.
+// Two requests per ~60s cycle, fully sequential, no bursts.
 
 const PROXY_BASE = import.meta.env.VITE_AROW_PROXY ?? "https://artemis-arow-proxy.jslay.workers.dev";
+
+const RAD2DEG = 180 / Math.PI;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -84,7 +88,7 @@ let _dsn: Stamped<ArowDsn> | null = null;
 let _solar: Stamped<ArowSolar> | null = null;
 
 let _lastSuccess = 0;
-const CONNECTED_WINDOW_MS = 30_000;
+const CONNECTED_WINDOW_MS = 120_000;
 
 // ─── Freshness helpers ──────────────────────────────────────────────────────
 
@@ -151,10 +155,61 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-// ─── Sequential poll loop ───────────────────────────────────────────────────
-// One request at a time, 2s gap between each, full cycle ~once per minute.
+// ─── GCS raw parameter parsing ──────────────────────────────────────────────
+// Parameter numbers from AROW Unity IL2CPP metadata (OnlineParameters class).
 
-const POLL_GAP_MS = 2_000;
+function param(raw: Record<string, RawParam>, num: number): number {
+  const p = raw[`Parameter_${num}`];
+  if (!p || p.Status !== "Good") return 0;
+  return parseFloat(p.Value);
+}
+
+interface RawParam {
+  Status: string;
+  Value: string;
+  Type: string;
+}
+
+function paramHex(raw: Record<string, RawParam>, num: number): string {
+  const p = raw[`Parameter_${num}`];
+  if (!p || p.Status !== "Good") return "";
+  return p.Value;
+}
+
+function parseGcsOrion(raw: Record<string, RawParam>): void {
+  const now = Date.now();
+
+  _attitude = {
+    data: {
+      quaternion: {
+        w: param(raw, 2074),
+        x: param(raw, 2075),
+        y: param(raw, 2076),
+        z: param(raw, 2077),
+      },
+      eulerDeg: {
+        roll:  param(raw, 2080) * RAD2DEG,
+        pitch: param(raw, 2078) * RAD2DEG,
+        yaw:   param(raw, 2079) * RAD2DEG,
+      },
+      rollRate:  param(raw, 2091) * RAD2DEG,
+      pitchRate: param(raw, 2092) * RAD2DEG,
+      yawRate:   param(raw, 2093) * RAD2DEG,
+      sawAngles: {
+        saw1: param(raw, 5006),
+        saw2: param(raw, 5007),
+        saw3: param(raw, 5008),
+        saw4: param(raw, 5009),
+      },
+      spacecraftMode: paramHex(raw, 2016),
+    },
+    receivedAt: now,
+  };
+}
+
+// ─── Sequential poll loop ───────────────────────────────────────────────────
+// Two requests per ~60s cycle: GCS for raw attitude, relay /api/all for the rest.
+
 let _running = false;
 
 async function pollLoop(): Promise<void> {
@@ -162,49 +217,33 @@ async function pollLoop(): Promise<void> {
   _running = true;
 
   while (_timers.length > 0) {
-    // Attitude
-    const arowData = await fetchJson<Record<string, unknown>>("/api/arow");
-    if (arowData) {
-      _attitude = {
-        data: {
-          quaternion: (arowData.quaternion as ArowAttitude["quaternion"]) ?? { w: 0, x: 0, y: 0, z: 0 },
-          eulerDeg: (arowData.eulerDeg as ArowAttitude["eulerDeg"]) ?? { roll: 0, pitch: 0, yaw: 0 },
-          rollRate: (arowData.rollRate as number) ?? 0,
-          pitchRate: (arowData.pitchRate as number) ?? 0,
-          yawRate: (arowData.yawRate as number) ?? 0,
-          sawAngles: (arowData.sawAngles as ArowAttitude["sawAngles"]) ?? { saw1: 0, saw2: 0, saw3: 0, saw4: 0 },
-          spacecraftMode: (arowData.spacecraftMode as string) ?? "",
-        },
-        receivedAt: Date.now(),
-      };
-    }
-    await delay(POLL_GAP_MS);
+    // 1. Attitude from NASA GCS (direct, reliable)
+    const gcs = await fetchJson<Record<string, RawParam>>("/gcs/orion");
+    if (gcs) parseGcsOrion(gcs);
 
-    // Orbit
-    const orbitData = await fetchJson<ArowOrbit>("/api/orbit");
-    if (orbitData) _orbit = { data: orbitData, receivedAt: Date.now() };
-    await delay(POLL_GAP_MS);
+    await delay(30_000);
 
-    // State vectors
-    const stateData = await fetchJson<{ stateVector: ArowStateVector; moonPosition: { x: number; y: number; z: number } }>("/api/state");
-    if (stateData) {
+    // 2. Computed orbital, DSN, solar from community relay
+    const all = await fetchJson<{
+      telemetry?: ArowOrbit;
+      stateVector?: ArowStateVector;
+      moonPosition?: { x: number; y: number; z: number };
+      dsn?: ArowDsn;
+    }>("/api/all");
+
+    if (all) {
       const now = Date.now();
-      if (stateData.stateVector) _stateVector = { data: stateData.stateVector, receivedAt: now };
-      if (stateData.moonPosition) _moonPosition = { data: stateData.moonPosition, receivedAt: now };
+      if (all.telemetry)    _orbit       = { data: all.telemetry,    receivedAt: now };
+      if (all.stateVector)  _stateVector = { data: all.stateVector,  receivedAt: now };
+      if (all.moonPosition) _moonPosition = { data: all.moonPosition, receivedAt: now };
+      if (all.dsn)          _dsn         = { data: all.dsn,          receivedAt: now };
     }
-    await delay(POLL_GAP_MS);
 
-    // DSN
-    const dsnData = await fetchJson<ArowDsn>("/api/dsn");
-    if (dsnData) _dsn = { data: dsnData, receivedAt: Date.now() };
-    await delay(POLL_GAP_MS);
+    // Solar is on its own endpoint (not in /api/all)
+    const solar = await fetchJson<ArowSolar>("/api/solar");
+    if (solar) _solar = { data: solar, receivedAt: Date.now() };
 
-    // Solar
-    const solarData = await fetchJson<ArowSolar>("/api/solar");
-    if (solarData) _solar = { data: solarData, receivedAt: Date.now() };
-
-    // Pad the remainder to ~60s total cycle
-    await delay(50_000);
+    await delay(30_000);
   }
 
   _running = false;

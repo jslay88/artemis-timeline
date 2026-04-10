@@ -3,6 +3,8 @@ interface Env {
   ALLOWED_ORIGIN: string;
 }
 
+const GCS_ORION = "https://storage.googleapis.com/p-2-cen1/October/1/October_105_1.txt";
+
 const ALLOWED_PATHS = [
   "/api/arow",
   "/api/orbit",
@@ -43,14 +45,18 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    if (!ALLOWED_PATHS.some((p) => path === p || path.startsWith(p + "?"))) {
-      return new Response("Not found", { status: 404, headers: cors });
-    }
-
     try {
-      const upstream = `${env.UPSTREAM}${path}${url.search}`;
       const ctrl = new AbortController();
       const timeout = setTimeout(() => ctrl.abort(), 8000);
+      let upstream: string;
+
+      if (path === "/gcs/orion") {
+        upstream = GCS_ORION;
+      } else if (ALLOWED_PATHS.some((p) => path === p || path.startsWith(p + "?"))) {
+        upstream = `${env.UPSTREAM}${path}${url.search}`;
+      } else {
+        return new Response("Not found", { status: 404, headers: cors });
+      }
 
       const resp = await fetch(upstream, {
         headers: { "User-Agent": "artemis-arow-proxy/1.0" },
@@ -60,6 +66,7 @@ export default {
 
       const headers = new Headers(resp.headers);
       for (const [k, v] of Object.entries(cors)) headers.set(k, v);
+      headers.set("Content-Type", "application/json");
 
       return new Response(resp.body, {
         status: resp.status,
