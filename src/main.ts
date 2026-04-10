@@ -479,6 +479,30 @@ if (scrollEl) {
   mobileQuery.addEventListener("change", applyMobileLayout);
 }
 
+/* ══════════════════════════════════════════════
+   Live AROW correction offsets
+   OEM provides smooth 4 Hz interpolation; when a live snapshot arrives
+   we compute the delta between live and OEM at that instant, then apply
+   it to every subsequent OEM frame so the gauges stay smooth AND accurate.
+   ══════════════════════════════════════════════ */
+let _orbitOffsets: { speed: number; earthDist: number; altitude: number; moonDist: number } | null = null;
+let _lastOffsetOrbit: arow.ArowOrbit | null = null;
+
+function updateOrbitOffsets(live: arow.ArowOrbit, _currentUtcMs: number): void {
+  if (live === _lastOffsetOrbit) return;
+  _lastOffsetOrbit = live;
+
+  const liveUtcMs = LAUNCH.getTime() + live.metMs;
+  const oem = getTelemetry(liveUtcMs);
+
+  _orbitOffsets = {
+    speed:     live.speedKmS       - oem.speed,
+    earthDist: live.earthDistKm    - oem.distanceFromEarth,
+    altitude:  live.altitudeKm     - oem.altitude,
+    moonDist:  live.moonDistKm     - oem.distanceFromMoon,
+  };
+}
+
 function formatRate(bps: number): string {
   if (bps >= 1e6) return (bps / 1e6).toFixed(1) + " M";
   if (bps >= 1e3) return (bps / 1e3).toFixed(1) + " k";
@@ -517,24 +541,26 @@ function updateDashboard() {
     }
   }
 
-  // ── Telemetry -- prefer live AROW during flight, fall back to OEM ──
+  // ── Telemetry -- OEM continuous baseline + live AROW correction ──
   const utcMs = LAUNCH.getTime() + metHours * 3600000;
   const tel = getTelemetry(utcMs);
 
   const liveOrbit = state.phase === "flight" ? arow.getOrbit() : null;
   if (liveOrbit) {
-    if (telSpeed)    telSpeed.textContent    = liveOrbit.speedKmS.toFixed(2);
-    if (telDistance) telDistance.textContent = Math.round(liveOrbit.earthDistKm).toLocaleString();
-    if (telAltitude) telAltitude.textContent = Math.round(liveOrbit.altitudeKm).toLocaleString();
-    if (telDistMoon) telDistMoon.textContent = Math.round(liveOrbit.moonDistKm).toLocaleString();
-    if (telGforce)   telGforce.textContent   = liveOrbit.gForce.toFixed(3);
-  } else {
-    if (telSpeed)    telSpeed.textContent    = tel.speed.toFixed(2);
-    if (telDistance) telDistance.textContent = Math.round(tel.distanceFromEarth).toLocaleString();
-    if (telAltitude) telAltitude.textContent = Math.round(tel.altitude).toLocaleString();
-    if (telDistMoon) telDistMoon.textContent = Math.round(tel.distanceFromMoon).toLocaleString();
-    if (telGforce)   telGforce.textContent   = "—";
+    updateOrbitOffsets(liveOrbit, utcMs);
   }
+
+  const hasOffsets = _orbitOffsets !== null;
+  const speed    = hasOffsets ? tel.speed            + _orbitOffsets!.speed    : tel.speed;
+  const earthDist = hasOffsets ? tel.distanceFromEarth + _orbitOffsets!.earthDist : tel.distanceFromEarth;
+  const altitude = hasOffsets ? tel.altitude          + _orbitOffsets!.altitude  : tel.altitude;
+  const moonDist = hasOffsets ? tel.distanceFromMoon   + _orbitOffsets!.moonDist  : tel.distanceFromMoon;
+
+  if (telSpeed)    telSpeed.textContent    = Math.max(0, speed).toFixed(2);
+  if (telDistance) telDistance.textContent = Math.round(Math.max(0, earthDist)).toLocaleString();
+  if (telAltitude) telAltitude.textContent = Math.round(Math.max(0, altitude)).toLocaleString();
+  if (telDistMoon) telDistMoon.textContent = Math.round(Math.max(0, moonDist)).toLocaleString();
+  if (telGforce)   telGforce.textContent   = liveOrbit ? liveOrbit.gForce.toFixed(3) : "—";
 
   const altBody = document.getElementById("tel-altitude-body");
   if (altBody) altBody.textContent = tel.altitudeBody === "moon" ? "☽" : "⊕";
