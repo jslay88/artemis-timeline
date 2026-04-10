@@ -106,15 +106,15 @@ export function getMoonPositionLive(maxAgeMs = 600_000): { x: number; y: number;
   return isFresh(_moonPosition, maxAgeMs) ? _moonPosition.data : null;
 }
 
-export function getAttitude(maxAgeMs = 5_000): ArowAttitude | null {
+export function getAttitude(maxAgeMs = 120_000): ArowAttitude | null {
   return isFresh(_attitude, maxAgeMs) ? _attitude.data : null;
 }
 
-export function getDsn(maxAgeMs = 30_000): ArowDsn | null {
+export function getDsn(maxAgeMs = 120_000): ArowDsn | null {
   return isFresh(_dsn, maxAgeMs) ? _dsn.data : null;
 }
 
-export function getSolar(maxAgeMs = 120_000): ArowSolar | null {
+export function getSolar(maxAgeMs = 300_000): ArowSolar | null {
   return isFresh(_solar, maxAgeMs) ? _solar.data : null;
 }
 
@@ -124,9 +124,19 @@ export function isConnected(): boolean {
 
 // ─── Fetch helpers ──────────────────────────────────────────────────────────
 
+const RETRY_DELAY_MS = 10_000;
+
 async function fetchJson<T>(path: string): Promise<T | null> {
   try {
     const resp = await fetch(`${PROXY_BASE}${path}`);
+    if (resp.status === 502) {
+      await delay(RETRY_DELAY_MS);
+      const retry = await fetch(`${PROXY_BASE}${path}`);
+      if (!retry.ok) return null;
+      _lastSuccess = Date.now();
+      _connected = true;
+      return await retry.json() as T;
+    }
     if (!resp.ok) return null;
     _lastSuccess = Date.now();
     _connected = true;
@@ -137,67 +147,75 @@ async function fetchJson<T>(path: string): Promise<T | null> {
   }
 }
 
-// ─── Pollers ────────────────────────────────────────────────────────────────
-
-async function pollArow(): Promise<void> {
-  const d = await fetchJson<Record<string, unknown>>("/api/arow");
-  if (!d) return;
-  _attitude = {
-    data: {
-      quaternion: (d.quaternion as ArowAttitude["quaternion"]) ?? { w: 0, x: 0, y: 0, z: 0 },
-      eulerDeg: (d.eulerDeg as ArowAttitude["eulerDeg"]) ?? { roll: 0, pitch: 0, yaw: 0 },
-      rollRate: (d.rollRate as number) ?? 0,
-      pitchRate: (d.pitchRate as number) ?? 0,
-      yawRate: (d.yawRate as number) ?? 0,
-      sawAngles: (d.sawAngles as ArowAttitude["sawAngles"]) ?? { saw1: 0, saw2: 0, saw3: 0, saw4: 0 },
-      spacecraftMode: (d.spacecraftMode as string) ?? "",
-    },
-    receivedAt: Date.now(),
-  };
+function delay(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
-async function pollOrbit(): Promise<void> {
-  const d = await fetchJson<ArowOrbit>("/api/orbit");
-  if (d) _orbit = { data: d, receivedAt: Date.now() };
-}
+// ─── Sequential poll loop ───────────────────────────────────────────────────
+// One request at a time, 2s gap between each, full cycle ~once per minute.
 
-async function pollState(): Promise<void> {
-  const d = await fetchJson<{ stateVector: ArowStateVector; moonPosition: { x: number; y: number; z: number } }>("/api/state");
-  if (!d) return;
-  const now = Date.now();
-  if (d.stateVector) _stateVector = { data: d.stateVector, receivedAt: now };
-  if (d.moonPosition) _moonPosition = { data: d.moonPosition, receivedAt: now };
-}
+const POLL_GAP_MS = 2_000;
+let _running = false;
 
-async function pollDsn(): Promise<void> {
-  const d = await fetchJson<ArowDsn>("/api/dsn");
-  if (d) _dsn = { data: d, receivedAt: Date.now() };
-}
+async function pollLoop(): Promise<void> {
+  if (_running) return;
+  _running = true;
 
-async function pollSolar(): Promise<void> {
-  const d = await fetchJson<ArowSolar>("/api/solar");
-  if (d) _solar = { data: d, receivedAt: Date.now() };
+  while (_timers.length > 0) {
+    // Attitude
+    const arowData = await fetchJson<Record<string, unknown>>("/api/arow");
+    if (arowData) {
+      _attitude = {
+        data: {
+          quaternion: (arowData.quaternion as ArowAttitude["quaternion"]) ?? { w: 0, x: 0, y: 0, z: 0 },
+          eulerDeg: (arowData.eulerDeg as ArowAttitude["eulerDeg"]) ?? { roll: 0, pitch: 0, yaw: 0 },
+          rollRate: (arowData.rollRate as number) ?? 0,
+          pitchRate: (arowData.pitchRate as number) ?? 0,
+          yawRate: (arowData.yawRate as number) ?? 0,
+          sawAngles: (arowData.sawAngles as ArowAttitude["sawAngles"]) ?? { saw1: 0, saw2: 0, saw3: 0, saw4: 0 },
+          spacecraftMode: (arowData.spacecraftMode as string) ?? "",
+        },
+        receivedAt: Date.now(),
+      };
+    }
+    await delay(POLL_GAP_MS);
+
+    // Orbit
+    const orbitData = await fetchJson<ArowOrbit>("/api/orbit");
+    if (orbitData) _orbit = { data: orbitData, receivedAt: Date.now() };
+    await delay(POLL_GAP_MS);
+
+    // State vectors
+    const stateData = await fetchJson<{ stateVector: ArowStateVector; moonPosition: { x: number; y: number; z: number } }>("/api/state");
+    if (stateData) {
+      const now = Date.now();
+      if (stateData.stateVector) _stateVector = { data: stateData.stateVector, receivedAt: now };
+      if (stateData.moonPosition) _moonPosition = { data: stateData.moonPosition, receivedAt: now };
+    }
+    await delay(POLL_GAP_MS);
+
+    // DSN
+    const dsnData = await fetchJson<ArowDsn>("/api/dsn");
+    if (dsnData) _dsn = { data: dsnData, receivedAt: Date.now() };
+    await delay(POLL_GAP_MS);
+
+    // Solar
+    const solarData = await fetchJson<ArowSolar>("/api/solar");
+    if (solarData) _solar = { data: solarData, receivedAt: Date.now() };
+
+    // Pad the remainder to ~60s total cycle
+    await delay(50_000);
+  }
+
+  _running = false;
 }
 
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
 export function connect(): void {
   if (_timers.length > 0) return;
-
-  // Stagger initial requests to avoid a burst of concurrent fetches
-  pollArow();
-  setTimeout(pollOrbit,  500);
-  setTimeout(pollState, 1000);
-  setTimeout(pollDsn,   1500);
-  setTimeout(pollSolar, 2000);
-
-  _timers.push(
-    setInterval(pollArow,   2_000),   // attitude — 2s (upstream is 1s)
-    setInterval(pollOrbit, 30_000),   // orbital  — 30s (upstream is 5 min)
-    setInterval(pollState, 30_000),   // state vectors — 30s
-    setInterval(pollDsn,   15_000),   // DSN — 15s (upstream is 10s)
-    setInterval(pollSolar, 120_000),  // solar — 2 min (upstream is 60s)
-  );
+  _timers.push(0 as unknown as ReturnType<typeof setInterval>);
+  pollLoop();
 }
 
 export function disconnect(): void {
