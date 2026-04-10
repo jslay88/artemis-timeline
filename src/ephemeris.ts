@@ -1,7 +1,7 @@
 // ephemeris.ts — Real NASA/JSC CCSDS OEM trajectory data for Artemis II
 // Parses the OEM file once at module load, provides O(log n) interpolation.
 
-import rawOem from "../Artemis_II_OEM_2026_04_04_to_EI.asc?raw";
+import rawOem from "../Artemis_II_OEM_2026_04_10_Post-ICPS-Sep-to-EI.asc?raw";
 import * as THREE from "three";
 
 // ─── Constants ─────────────────────────────────────────────────────────────
