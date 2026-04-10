@@ -10,8 +10,8 @@ export const R_MOON  = 1737.4;   // km
 const SCALE = 1 / R_EARTH;
 const LAUNCH_MS = new Date("2026-04-01T22:35:12Z").getTime();
 
-const LUNAR_SOI_ENTRY_MET_H = 102.111;
-const LUNAR_SOI_EXIT_MET_H  = 138.911;
+const LUNAR_SOI_ENTRY_MET_H = 102.074;
+const LUNAR_SOI_EXIT_MET_H  = 138.809;
 
 // Moon EME2000/ICRF positions from JPL DE441 ephemeris (Horizons API),
 // every 6 hours for the full mission. Linearly interpolated at runtime.
@@ -84,7 +84,7 @@ function getMoonEME2000At(utcMs: number): { x: number; y: number; z: number } {
 }
 
 // Closest-approach Moon position for 3D scene rendering (MET ~120.5h)
-const MOON_SCENE_EME = getMoonEME2000At(LAUNCH_MS + 120.511 * 3600000);
+const MOON_SCENE_EME = getMoonEME2000At(LAUNCH_MS + 120.461 * 3600000);
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 export interface StateVector {

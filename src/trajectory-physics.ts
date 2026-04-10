@@ -13,9 +13,9 @@ const SOI_MOON = 66100;       // km from Moon center
 
 // ─── Mission Timeline (MET hours) ─────────────────────────────────────────
 const T_TLI          = 25.244;   // Trans-Lunar Injection (perigee burn, from OEM)
-const T_SOI_ENTRY    = 102.111;  // Enter Moon SOI (SC-Moon crosses 66,100 km inbound)
-const T_PERICYNTHION = 120.511;  // Closest lunar approach (from OEM + JPL DE441)
-const T_SOI_EXIT     = 138.911;  // Exit Moon SOI (SC-Moon crosses 66,100 km outbound)
+const T_SOI_ENTRY    = 102.074;  // Enter Moon SOI (SC-Moon crosses 66,100 km inbound)
+const T_PERICYNTHION = 120.461;  // Closest lunar approach (from OEM + JPL DE441)
+const T_SOI_EXIT     = 138.809;  // Exit Moon SOI (SC-Moon crosses 66,100 km outbound)
 const T_ENTRY_IF     = 217.55;   // Entry Interface (EI)
 const T_SPLASHDOWN   = 217.767;  // Splashdown
 

@@ -57,10 +57,10 @@ interface Milestone {
 const MILESTONES: Milestone[] = [
   { key: "ms.launch", metHours: 0, color: 0x4ade80 },
   { key: "ms.tli", metHours: 25.244, color: 0x60a5fa },
-  { key: "ms.lunarSoi", metHours: 102.111, color: 0xa78bfa },
-  { key: "ms.closeApproach", metHours: 120.511, color: 0xfbbf24 },
-  { key: "ms.maxDistance", metHours: 120.55, color: 0xf59e0b },
-  { key: "ms.soiExit", metHours: 138.911, color: 0xa78bfa },
+  { key: "ms.lunarSoi", metHours: 102.074, color: 0xa78bfa },
+  { key: "ms.closeApproach", metHours: 120.461, color: 0xfbbf24 },
+  { key: "ms.maxDistance", metHours: 120.461, color: 0xf59e0b },
+  { key: "ms.soiExit", metHours: 138.809, color: 0xa78bfa },
   { key: "ms.splashdown", metHours: 217.767, color: 0xef4444 },
 ];
 
