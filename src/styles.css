@@ -705,6 +705,28 @@ html, body {
   letter-spacing: 0.06em;
 }
 
+/* Odometer digit columns */
+.odo {
+  display: inline-flex;
+  line-height: 1.1;
+}
+.odo__col {
+  display: inline-block;
+  height: 1.1em;
+  overflow: hidden;
+}
+.odo__strip {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.odo__strip > span {
+  display: block;
+  height: 1.1em;
+  line-height: 1.1;
+}
+.odo__sep {
+  display: inline-block;
+}
+
 /* AROW connection badge */
 .arow-badge {
   display: inline-flex;

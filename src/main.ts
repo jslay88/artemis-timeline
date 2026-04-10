@@ -504,35 +504,49 @@ function updateOrbitOffsets(live: arow.ArowOrbit, _currentUtcMs: number): void {
 }
 
 /* ══════════════════════════════════════════════
-   Rolling gauge display — 60fps smooth number animation
-   The 4 Hz data loop sets target values; a rAF loop lerps
-   the displayed numbers toward them for steady ticking.
+   Odometer gauge — 60fps smooth number animation
+   Each digit sits in a clipped column of 0-9. CSS transitions
+   slide the column when a digit changes, giving a mechanical
+   odometer effect. The 4 Hz data loop sets targets; a rAF loop
+   lerps the underlying value for steady tick cadence.
    ══════════════════════════════════════════════ */
+const ODO_H = 1.1; // em — matches telem-item__value line-height
+
 class Gauge {
-  private _current: number;
-  private _target: number;
+  private _current = 0;
+  private _target = 0;
   private _el: HTMLElement | null;
   private _format: (v: number) => string;
   private _lastText = "";
+  private _template = "";
+  private _strips: HTMLElement[] = [];
+  private _lastDigits: number[] = [];
+  private _active = false;
 
-  constructor(el: HTMLElement | null, format: (v: number) => string, initial = 0) {
+  constructor(el: HTMLElement | null, format: (v: number) => string) {
     this._el = el;
     this._format = format;
-    this._current = initial;
-    this._target = initial;
   }
 
   set(target: number): void {
+    if (!this._active) {
+      this._current = target;
+      this._active = true;
+    }
     this._target = target;
   }
 
-  snap(value: number): void {
-    this._current = value;
-    this._target = value;
-    this._render();
+  reset(): void {
+    this._active = false;
+    this._template = "";
+    this._strips = [];
+    this._lastDigits = [];
+    this._lastText = "";
+    if (this._el) this._el.textContent = "—";
   }
 
   tick(alpha: number): void {
+    if (!this._active) return;
     const diff = this._target - this._current;
     if (Math.abs(diff) < 0.001) {
       this._current = this._target;
@@ -545,10 +559,64 @@ class Gauge {
   private _render(): void {
     if (!this._el) return;
     const text = this._format(this._current);
-    if (text !== this._lastText) {
-      this._lastText = text;
-      this._el.textContent = text;
+    if (text === this._lastText) return;
+    this._lastText = text;
+
+    const tpl = text.replace(/\d/g, "#");
+    if (tpl !== this._template) {
+      this._template = tpl;
+      this._buildOdo(text);
+      return;
     }
+
+    let si = 0;
+    for (const ch of text) {
+      if (ch >= "0" && ch <= "9") {
+        const d = parseInt(ch);
+        if (d !== this._lastDigits[si]) {
+          this._lastDigits[si] = d;
+          this._strips[si].style.transform = `translateY(${-d * ODO_H}em)`;
+        }
+        si++;
+      }
+    }
+  }
+
+  private _buildOdo(text: string): void {
+    const el = this._el!;
+    el.textContent = "";
+    this._strips = [];
+    this._lastDigits = [];
+
+    const wrap = document.createElement("span");
+    wrap.className = "odo";
+
+    for (const ch of text) {
+      if (ch >= "0" && ch <= "9") {
+        const d = parseInt(ch);
+        const col = document.createElement("span");
+        col.className = "odo__col";
+        const strip = document.createElement("span");
+        strip.className = "odo__strip";
+        strip.style.transform = `translateY(${-d * ODO_H}em)`;
+        for (let n = 0; n < 10; n++) {
+          const s = document.createElement("span");
+          s.textContent = String(n);
+          strip.appendChild(s);
+        }
+        col.appendChild(strip);
+        wrap.appendChild(col);
+        this._strips.push(strip);
+        this._lastDigits.push(d);
+      } else {
+        const sep = document.createElement("span");
+        sep.className = "odo__sep";
+        sep.textContent = ch;
+        wrap.appendChild(sep);
+      }
+    }
+
+    el.appendChild(wrap);
   }
 }
 
@@ -641,8 +709,8 @@ function updateDashboard() {
 
   if (liveOrbit) {
     gaugeGforce.set(liveOrbit.gForce);
-  } else if (telGforce) {
-    telGforce.textContent = "—";
+  } else {
+    gaugeGforce.reset();
   }
 
   const altBody = document.getElementById("tel-altitude-body");
@@ -655,9 +723,9 @@ function updateDashboard() {
     gaugePitch.set(att.eulerDeg.pitch);
     gaugeYaw.set(att.eulerDeg.yaw);
   } else {
-    if (telRoll)  telRoll.textContent  = "—";
-    if (telPitch) telPitch.textContent = "—";
-    if (telYaw)   telYaw.textContent   = "—";
+    gaugeRoll.reset();
+    gaugePitch.reset();
+    gaugeYaw.reset();
   }
 
   // ── AROW DSN ──
