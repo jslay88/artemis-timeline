@@ -503,6 +503,84 @@ function updateOrbitOffsets(live: arow.ArowOrbit, _currentUtcMs: number): void {
   };
 }
 
+/* ══════════════════════════════════════════════
+   Rolling gauge display — 60fps smooth number animation
+   The 4 Hz data loop sets target values; a rAF loop lerps
+   the displayed numbers toward them for steady ticking.
+   ══════════════════════════════════════════════ */
+class Gauge {
+  private _current: number;
+  private _target: number;
+  private _el: HTMLElement | null;
+  private _format: (v: number) => string;
+  private _lastText = "";
+
+  constructor(el: HTMLElement | null, format: (v: number) => string, initial = 0) {
+    this._el = el;
+    this._format = format;
+    this._current = initial;
+    this._target = initial;
+  }
+
+  set(target: number): void {
+    this._target = target;
+  }
+
+  snap(value: number): void {
+    this._current = value;
+    this._target = value;
+    this._render();
+  }
+
+  tick(alpha: number): void {
+    const diff = this._target - this._current;
+    if (Math.abs(diff) < 0.001) {
+      this._current = this._target;
+    } else {
+      this._current += diff * alpha;
+    }
+    this._render();
+  }
+
+  private _render(): void {
+    if (!this._el) return;
+    const text = this._format(this._current);
+    if (text !== this._lastText) {
+      this._lastText = text;
+      this._el.textContent = text;
+    }
+  }
+}
+
+const fmtSpeed  = (v: number) => Math.max(0, v).toFixed(2);
+const fmtInt    = (v: number) => Math.round(Math.max(0, v)).toLocaleString();
+const fmtDeg    = (v: number) => v.toFixed(1);
+const fmtGforce = (v: number) => v.toFixed(3);
+
+const gaugeSpeed    = new Gauge(telSpeed,    fmtSpeed);
+const gaugeEarthDist = new Gauge(telDistance, fmtInt);
+const gaugeAltitude = new Gauge(telAltitude, fmtInt);
+const gaugeMoonDist = new Gauge(telDistMoon, fmtInt);
+const gaugeGforce   = new Gauge(telGforce,   fmtGforce);
+const gaugeRoll     = new Gauge(telRoll,     fmtDeg);
+const gaugePitch    = new Gauge(telPitch,    fmtDeg);
+const gaugeYaw      = new Gauge(telYaw,      fmtDeg);
+
+const GAUGE_ALPHA = 0.12;
+
+function tickGauges(): void {
+  gaugeSpeed.tick(GAUGE_ALPHA);
+  gaugeEarthDist.tick(GAUGE_ALPHA);
+  gaugeAltitude.tick(GAUGE_ALPHA);
+  gaugeMoonDist.tick(GAUGE_ALPHA);
+  gaugeGforce.tick(GAUGE_ALPHA);
+  gaugeRoll.tick(GAUGE_ALPHA);
+  gaugePitch.tick(GAUGE_ALPHA);
+  gaugeYaw.tick(GAUGE_ALPHA);
+  requestAnimationFrame(tickGauges);
+}
+requestAnimationFrame(tickGauges);
+
 function formatRate(bps: number): string {
   if (bps >= 1e6) return (bps / 1e6).toFixed(1) + " M";
   if (bps >= 1e3) return (bps / 1e3).toFixed(1) + " k";
@@ -556,11 +634,16 @@ function updateDashboard() {
   const altitude = hasOffsets ? tel.altitude          + _orbitOffsets!.altitude  : tel.altitude;
   const moonDist = hasOffsets ? tel.distanceFromMoon   + _orbitOffsets!.moonDist  : tel.distanceFromMoon;
 
-  if (telSpeed)    telSpeed.textContent    = Math.max(0, speed).toFixed(2);
-  if (telDistance) telDistance.textContent = Math.round(Math.max(0, earthDist)).toLocaleString();
-  if (telAltitude) telAltitude.textContent = Math.round(Math.max(0, altitude)).toLocaleString();
-  if (telDistMoon) telDistMoon.textContent = Math.round(Math.max(0, moonDist)).toLocaleString();
-  if (telGforce)   telGforce.textContent   = liveOrbit ? liveOrbit.gForce.toFixed(3) : "—";
+  gaugeSpeed.set(speed);
+  gaugeEarthDist.set(earthDist);
+  gaugeAltitude.set(altitude);
+  gaugeMoonDist.set(moonDist);
+
+  if (liveOrbit) {
+    gaugeGforce.set(liveOrbit.gForce);
+  } else if (telGforce) {
+    telGforce.textContent = "—";
+  }
 
   const altBody = document.getElementById("tel-altitude-body");
   if (altBody) altBody.textContent = tel.altitudeBody === "moon" ? "☽" : "⊕";
@@ -568,9 +651,9 @@ function updateDashboard() {
   // ── AROW attitude ──
   const att = state.phase === "flight" ? arow.getAttitude() : null;
   if (att) {
-    if (telRoll)  telRoll.textContent  = att.eulerDeg.roll.toFixed(1);
-    if (telPitch) telPitch.textContent = att.eulerDeg.pitch.toFixed(1);
-    if (telYaw)   telYaw.textContent   = att.eulerDeg.yaw.toFixed(1);
+    gaugeRoll.set(att.eulerDeg.roll);
+    gaugePitch.set(att.eulerDeg.pitch);
+    gaugeYaw.set(att.eulerDeg.yaw);
   } else {
     if (telRoll)  telRoll.textContent  = "—";
     if (telPitch) telPitch.textContent = "—";
