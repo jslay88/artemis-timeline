@@ -511,6 +511,11 @@ function updateOrbitOffsets(live: arow.ArowOrbit, _currentUtcMs: number): void {
    lerps the underlying value for steady tick cadence.
    ══════════════════════════════════════════════ */
 const ODO_H = 1.1; // em — matches telem-item__value line-height
+// Strip layout: [ 9 | 0 1 2 3 4 5 6 7 8 9 | 0 ]
+// Index:          0   1 2 3 4 5 6 7 8 9 10  11
+// Digit d sits at index d+1. Extra 9 at top and 0 at bottom allow
+// wrapping in either direction without reversing.
+const ODO_OFFSET = 1; // digit d → index d + ODO_OFFSET
 
 class Gauge {
   private _current = 0;
@@ -574,12 +579,50 @@ class Gauge {
       if (ch >= "0" && ch <= "9") {
         const d = parseInt(ch);
         if (d !== this._lastDigits[si]) {
+          const prev = this._lastDigits[si];
           this._lastDigits[si] = d;
-          this._strips[si].style.transform = `translateY(${-d * ODO_H}em)`;
+          this._animateDigit(si, prev, d);
         }
         si++;
       }
     }
+  }
+
+  private _animateDigit(si: number, from: number, to: number): void {
+    const strip = this._strips[si];
+    const forward = (to - from + 10) % 10 <= 5;
+
+    if (from === 9 && to === 0) {
+      // 9→0 wrapping forward: animate to the extra 0 at index 11
+      strip.style.transform = `translateY(${-11 * ODO_H}em)`;
+      this._snapAfterTransition(strip, to);
+    } else if (from === 0 && to === 9) {
+      // 0→9 wrapping backward: animate to the extra 9 at index 0
+      strip.style.transform = `translateY(${0}em)`;
+      this._snapAfterTransition(strip, to);
+    } else if (forward && from > to) {
+      // e.g. 8→1: wraps through 0, animate to 11 + to
+      strip.style.transform = `translateY(${-(11 + to) * ODO_H}em)`;
+      this._snapAfterTransition(strip, to);
+    } else if (!forward && from < to) {
+      // e.g. 1→8: wraps backward through 0, animate to -(to - 10)
+      strip.style.transform = `translateY(${-(to - 10 + ODO_OFFSET) * ODO_H}em)`;
+      this._snapAfterTransition(strip, to);
+    } else {
+      strip.style.transform = `translateY(${-(to + ODO_OFFSET) * ODO_H}em)`;
+    }
+  }
+
+  private _snapAfterTransition(strip: HTMLElement, digit: number): void {
+    const handler = () => {
+      strip.removeEventListener("transitionend", handler);
+      strip.style.transition = "none";
+      strip.style.transform = `translateY(${-(digit + ODO_OFFSET) * ODO_H}em)`;
+      // Force reflow then restore transition
+      strip.offsetHeight;
+      strip.style.transition = "";
+    };
+    strip.addEventListener("transitionend", handler, { once: true });
   }
 
   private _buildOdo(text: string): void {
@@ -598,10 +641,11 @@ class Gauge {
         col.className = "odo__col";
         const strip = document.createElement("span");
         strip.className = "odo__strip";
-        strip.style.transform = `translateY(${-d * ODO_H}em)`;
-        for (let n = 0; n < 10; n++) {
+        strip.style.transform = `translateY(${-(d + ODO_OFFSET) * ODO_H}em)`;
+        // Layout: 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0
+        for (const digit of [9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0]) {
           const s = document.createElement("span");
-          s.textContent = String(n);
+          s.textContent = String(digit);
           strip.appendChild(s);
         }
         col.appendChild(strip);
