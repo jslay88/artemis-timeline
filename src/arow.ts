@@ -2,7 +2,7 @@
 // Uses REST polling through a CORS proxy. Each endpoint is polled at its
 // natural cadence: attitude 2s, DSN 15s, orbit 30s, solar 120s.
 
-const PROXY_BASE = import.meta.env.VITE_AROW_PROXY ?? "https://artemis-arow-proxy.jslay88.workers.dev";
+const PROXY_BASE = import.meta.env.VITE_AROW_PROXY ?? "https://artemis-arow-proxy.jslay.workers.dev";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
